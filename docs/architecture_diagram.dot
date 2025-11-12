@@ -1,0 +1,229 @@
+digraph ArchitectureValidationSystem {
+    // Graph properties
+    graph [rankdir=TB, fontname="Arial", fontsize=12, bgcolor="#f8f9fa", pad=0.5];
+    node [fontname="Arial", fontsize=11, shape=box, style="rounded,filled"];
+    edge [fontname="Arial", fontsize=10];
+
+    // Title
+    label = "Architecture Validation & Pattern Management System\nComplete Application Architecture";
+    labelloc = "t";
+    fontsize = 16;
+    fontname = "Arial Bold";
+
+    // Layer: User Interfaces
+    subgraph cluster_ui {
+        label = "User Interfaces";
+        style = "filled,rounded";
+        fillcolor = "#e3f2fd";
+        color = "#1976d2";
+        fontcolor = "#1976d2";
+
+        CLI [label="CLI Tool\n(validate.py)\nClick + Rich", fillcolor="#90caf9"];
+        WebUI [label="Web UI\n(index.html)\nBootstrap 5.3", fillcolor="#90caf9"];
+        Dashboard [label="Analytics Dashboard\n(dashboard.html)\nChart.js", fillcolor="#90caf9"];
+        APIClient [label="REST API Clients\n(External Tools)", fillcolor="#90caf9"];
+    }
+
+    // Layer: API Gateway
+    subgraph cluster_api {
+        label = "REST API Layer (FastAPI)";
+        style = "filled,rounded";
+        fillcolor = "#fff3e0";
+        color = "#f57c00";
+        fontcolor = "#f57c00";
+
+        MainAPI [label="main.py\nFastAPI App\nv0.2.0", fillcolor="#ffcc80"];
+
+        subgraph cluster_routers {
+            label = "API Routers";
+            style = "filled";
+            fillcolor = "#ffe0b2";
+
+            ValidationRouter [label="Validation\nRouter", fillcolor="#ffb74d"];
+            PatternsRouter [label="Patterns\nRouter", fillcolor="#ffb74d"];
+            CMDBRouter [label="CMDB\nRouter", fillcolor="#ffb74d"];
+            AnalyticsRouter [label="Analytics\nRouter", fillcolor="#ffb74d"];
+            HistoryRouter [label="History\nRouter", fillcolor="#ffb74d"];
+        }
+    }
+
+    // Layer: Core Business Logic
+    subgraph cluster_core {
+        label = "Core Validation Engine";
+        style = "filled,rounded";
+        fillcolor = "#f3e5f5";
+        color = "#7b1fa2";
+        fontcolor = "#7b1fa2";
+
+        ValidationEngine [label="Validation Engine\n(engine.py)\nParallel/Sequential", fillcolor="#ce93d8"];
+        RuleRegistry [label="Rule Registry\n(rule.py)\n15 Rules", fillcolor="#ce93d8"];
+        PatternMatcher [label="Pattern Matcher\n(matcher.py)\nSimilarity Scoring", fillcolor="#ce93d8"];
+        ApprovalRouter [label="Approval Router\nFast/Standard/Full", fillcolor="#ce93d8"];
+    }
+
+    // Layer: Validation Rules
+    subgraph cluster_rules {
+        label = "Validation Rules (15 Rules)";
+        style = "filled,rounded";
+        fillcolor = "#fce4ec";
+        color = "#c2185b";
+        fontcolor = "#c2185b";
+
+        SecurityRules [label="Security Rules\n(4 rules)\nSEC-001 to SEC-004", fillcolor="#f48fb1"];
+        MetadataRules [label="Metadata Rules\n(2 rules)\nMETA-001, META-002", fillcolor="#f48fb1"];
+        TechRules [label="Technology Rules\n(2 rules)\nTECH-001, TECH-002", fillcolor="#f48fb1"];
+        ResilienceRules [label="Resilience Rules\n(2 rules)\nRES-001, RES-002", fillcolor="#f48fb1"];
+        NetworkRules [label="Network Rules\n(3 rules)\nNET-001 to NET-003", fillcolor="#f48fb1"];
+        CostRules [label="Cost Rules\n(2 rules)\nCOST-001, COST-002", fillcolor="#f48fb1"];
+    }
+
+    // Layer: Pattern Library
+    subgraph cluster_patterns {
+        label = "Pattern Library System";
+        style = "filled,rounded";
+        fillcolor = "#e8f5e9";
+        color = "#388e3c";
+        fontcolor = "#388e3c";
+
+        PatternLibrary [label="Pattern Library\n(library.py)\nYAML Loader", fillcolor="#a5d6a7"];
+
+        subgraph cluster_pattern_types {
+            label = "Reference Patterns";
+            style = "filled";
+            fillcolor = "#c8e6c9";
+
+            Pattern3Tier [label="PAT-001\n3-Tier Web App", fillcolor="#81c784"];
+            PatternMicro [label="PAT-002\nMicroservices", fillcolor="#81c784"];
+            PatternHA [label="COMP-001\nHA Database", fillcolor="#81c784"];
+        }
+    }
+
+    // Layer: Data Sources
+    subgraph cluster_sources {
+        label = "Data Sources & Integrations";
+        style = "filled,rounded";
+        fillcolor = "#e0f2f1";
+        color = "#00796b";
+        fontcolor = "#00796b";
+
+        TerraformParser [label="Terraform Parser\n(parser.py)\nJSON Plan Loader", fillcolor="#80cbc4"];
+        CMDBConnector [label="ServiceNow CMDB\n(connector.py)\nREST API Client", fillcolor="#80cbc4"];
+    }
+
+    // Layer: Database & Persistence
+    subgraph cluster_database {
+        label = "Database Layer (SQLAlchemy)";
+        style = "filled,rounded";
+        fillcolor = "#fff9c4";
+        color = "#f57f17";
+        fontcolor = "#f57f17";
+
+        DatabaseModels [label="Database Models\n(models.py)\n4 Tables", fillcolor="#fff59d"];
+
+        subgraph cluster_tables {
+            label = "Database Tables";
+            style = "filled";
+            fillcolor = "#fff9c4";
+
+            ValidationHistory [label="validation_history\nAudit Trail", fillcolor="#ffee58"];
+            PatternUsage [label="pattern_usage\nAdoption Metrics", fillcolor="#ffee58"];
+            RuleViolation [label="rule_violation\nViolation Tracking", fillcolor="#ffee58"];
+            ComplianceTrend [label="compliance_trend\nDaily Aggregates", fillcolor="#ffee58"];
+        }
+
+        Repositories [label="Repository Pattern\n(repository.py)\nData Access Layer", fillcolor="#fff59d"];
+    }
+
+    // Layer: External Systems
+    subgraph cluster_external {
+        label = "External Systems";
+        style = "filled,rounded";
+        fillcolor = "#efebe9";
+        color = "#5d4037";
+        fontcolor = "#5d4037";
+
+        ServiceNow [label="ServiceNow CMDB\nConfiguration Items\nRelationships", fillcolor="#d7ccc8", shape=cylinder];
+        Terraform [label="Terraform\nInfrastructure Plans\nJSON Output", fillcolor="#d7ccc8", shape=folder];
+        GitRepo [label="Git Repository\nPattern YAML Files\nVersion Control", fillcolor="#d7ccc8", shape=folder];
+    }
+
+    // Layer: Supporting Services
+    subgraph cluster_support {
+        label = "Supporting Services";
+        style = "filled,rounded";
+        fillcolor = "#e1f5fe";
+        color = "#0277bd";
+        fontcolor = "#0277bd";
+
+        ConfigManager [label="Configuration\n(config.py)\nPydantic Settings", fillcolor="#b3e5fc"];
+        Logger [label="Logging System\nStructured Logs\nJSON Format", fillcolor="#b3e5fc"];
+        DiagramGen [label="Diagram Generator\n(diagrams.py)\nGraphviz", fillcolor="#b3e5fc"];
+    }
+
+    // User Interface connections
+    CLI -> MainAPI [label="HTTP", color="#1976d2"];
+    WebUI -> MainAPI [label="HTTP", color="#1976d2"];
+    Dashboard -> MainAPI [label="HTTP", color="#1976d2"];
+    APIClient -> MainAPI [label="HTTP", color="#1976d2"];
+
+    // API Router connections
+    MainAPI -> ValidationRouter [style=dashed, color="#f57c00"];
+    MainAPI -> PatternsRouter [style=dashed, color="#f57c00"];
+    MainAPI -> CMDBRouter [style=dashed, color="#f57c00"];
+    MainAPI -> AnalyticsRouter [style=dashed, color="#f57c00"];
+    MainAPI -> HistoryRouter [style=dashed, color="#f57c00"];
+
+    // Validation flow
+    ValidationRouter -> ValidationEngine [label="validate()", color="#7b1fa2"];
+    ValidationEngine -> RuleRegistry [label="get_rules()", color="#7b1fa2"];
+    ValidationEngine -> PatternMatcher [label="match_pattern()", color="#7b1fa2"];
+    ValidationEngine -> ApprovalRouter [label="determine_track()", color="#7b1fa2"];
+
+    // Rule execution
+    RuleRegistry -> SecurityRules [style=dashed, color="#c2185b"];
+    RuleRegistry -> MetadataRules [style=dashed, color="#c2185b"];
+    RuleRegistry -> TechRules [style=dashed, color="#c2185b"];
+    RuleRegistry -> ResilienceRules [style=dashed, color="#c2185b"];
+    RuleRegistry -> NetworkRules [style=dashed, color="#c2185b"];
+    RuleRegistry -> CostRules [style=dashed, color="#c2185b"];
+
+    // Pattern matching
+    PatternsRouter -> PatternLibrary [label="get_patterns()", color="#388e3c"];
+    PatternLibrary -> Pattern3Tier [style=dashed, color="#388e3c"];
+    PatternLibrary -> PatternMicro [style=dashed, color="#388e3c"];
+    PatternLibrary -> PatternHA [style=dashed, color="#388e3c"];
+    PatternLibrary -> GitRepo [label="load YAML", color="#388e3c"];
+    PatternMatcher -> PatternLibrary [label="get_all()", color="#388e3c"];
+
+    // Data source integration
+    ValidationRouter -> TerraformParser [label="parse_plan()", color="#00796b"];
+    CMDBRouter -> CMDBConnector [label="query()", color="#00796b"];
+    TerraformParser -> Terraform [label="read JSON", color="#00796b"];
+    CMDBConnector -> ServiceNow [label="REST API", color="#00796b"];
+
+    // Database operations
+    HistoryRouter -> Repositories [label="save/query", color="#f57f17"];
+    AnalyticsRouter -> Repositories [label="get_stats()", color="#f57f17"];
+    Repositories -> DatabaseModels [label="ORM", color="#f57f17"];
+    DatabaseModels -> ValidationHistory [style=dashed, color="#f57f17"];
+    DatabaseModels -> PatternUsage [style=dashed, color="#f57f17"];
+    DatabaseModels -> RuleViolation [style=dashed, color="#f57f17"];
+    DatabaseModels -> ComplianceTrend [style=dashed, color="#f57f17"];
+
+    // Supporting services
+    MainAPI -> ConfigManager [label="load config", color="#0277bd", style=dotted];
+    MainAPI -> Logger [label="log events", color="#0277bd", style=dotted];
+    PatternsRouter -> DiagramGen [label="generate diagram", color="#0277bd"];
+
+    // Legend
+    subgraph cluster_legend {
+        label = "Legend";
+        style = "filled,rounded";
+        fillcolor = "#ffffff";
+        color = "#000000";
+
+        L1 [label="Solid line = Data flow", shape=plaintext];
+        L2 [label="Dashed line = Component relationship", shape=plaintext];
+        L3 [label="Dotted line = Utility/support", shape=plaintext];
+    }
+}

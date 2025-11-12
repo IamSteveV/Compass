@@ -26,6 +26,13 @@ A proof-of-concept system for validating infrastructure against architectural st
 - **Test Data Generators**: Generate sample data for testing and demos
 - **Diagram Generation**: Auto-generate architecture diagrams with Graphviz
 
+## Architecture
+
+For a comprehensive understanding of the system architecture:
+
+- **[Complete Architecture Diagram](docs/ARCHITECTURE_DIAGRAM.md)** - Detailed technical architecture with all components, data flows, and integrations
+- **[Simple Architecture Overview](docs/SIMPLE_ARCHITECTURE.md)** - High-level architecture diagram and quick reference
+
 ## Quick Start
 
 ### Prerequisites
