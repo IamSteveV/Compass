@@ -353,6 +353,9 @@ function displayValidationReport(report) {
             <button class="btn btn-sm btn-outline-primary" onclick="downloadReport()">
                 <i class="bi bi-download"></i> Download JSON
             </button>
+            <button class="btn btn-sm btn-outline-danger" onclick="downloadPDFReport()">
+                <i class="bi bi-file-pdf"></i> Download PDF
+            </button>
         </div>
     `;
 
@@ -512,6 +515,49 @@ function downloadReport() {
     URL.revokeObjectURL(url);
 
     Toast.success('Report downloaded successfully');
+}
+
+// Download report as PDF
+async function downloadPDFReport() {
+    if (!window.currentReport) {
+        Toast.error('No report available to download');
+        return;
+    }
+
+    try {
+        Toast.info('Generating PDF report...');
+
+        const response = await fetch(`${API_BASE}/reports/generate-pdf`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(window.currentReport)
+        });
+
+        if (!response.ok) {
+            throw new Error(`PDF generation failed: ${response.statusText}`);
+        }
+
+        // Get PDF blob
+        const blob = await response.blob();
+
+        // Create download link
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `validation-report-${window.currentReport.id}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        Toast.success('PDF report downloaded successfully');
+
+    } catch (error) {
+        Toast.error(`Failed to generate PDF: ${error.message}`);
+        console.error('PDF generation error:', error);
+    }
 }
 
 // Generate text version of report

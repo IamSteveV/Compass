@@ -11,7 +11,7 @@ from typing import List, Optional
 import logging
 
 from ..config import get_settings
-from .routers import patterns, validation, cmdb, analytics, history
+from .routers import patterns, validation, cmdb, analytics, history, reports
 from ..database.session import init_db
 
 # Configure logging
@@ -25,7 +25,7 @@ settings = get_settings()
 app = FastAPI(
     title="Architecture Validation & Pattern Management System",
     description="POC system for validating infrastructure against architectural standards",
-    version="0.2.0",
+    version="0.4.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc"
 )
@@ -57,6 +57,7 @@ app.include_router(validation.router, prefix="/api/validate", tags=["validation"
 app.include_router(cmdb.router, prefix="/api/cmdb", tags=["cmdb"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(history.router, prefix="/api/history", tags=["history"])
+app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 
 # Serve static files for frontend
 static_path = Path(__file__).parent.parent.parent / "static"
@@ -69,7 +70,7 @@ async def root():
     """Root endpoint"""
     return {
         "name": "Architecture Validation & Pattern Management System",
-        "version": "0.1.0",
+        "version": "0.4.0",
         "status": "running",
         "docs": "/api/docs"
     }
@@ -86,7 +87,7 @@ async def health_check():
 
     health_status = {
         "status": "healthy",
-        "version": "0.2.0",
+        "version": "0.4.0",
         "timestamp": datetime.utcnow().isoformat(),
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.patch}",
         "components": {}
@@ -147,13 +148,14 @@ async def api_info():
     """API information"""
     return {
         "name": "Architecture Validation API",
-        "version": "0.2.0",
+        "version": "0.4.0",
         "endpoints": {
             "patterns": "/api/patterns",
             "validation": "/api/validate",
             "cmdb": "/api/cmdb",
             "analytics": "/api/analytics",
             "history": "/api/history",
+            "reports": "/api/reports",
             "health": "/health",
             "metrics": "/metrics"
         }
