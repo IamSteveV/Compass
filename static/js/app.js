@@ -88,10 +88,11 @@ function showSection(section) {
     const validateSection = document.getElementById('validate-section');
     const patternsSection = document.getElementById('patterns-section');
     const notificationsSection = document.getElementById('notifications-section');
+    const terraformCloudSection = document.getElementById('terraform-cloud-section');
 
     // Fade out current section
-    [validateSection, patternsSection, notificationsSection].forEach(s => {
-        if (s.style.display !== 'none') {
+    [validateSection, patternsSection, notificationsSection, terraformCloudSection].forEach(s => {
+        if (s && s.style.display !== 'none') {
             s.style.opacity = '0';
             setTimeout(() => {
                 s.style.display = 'none';
@@ -112,6 +113,9 @@ function showSection(section) {
             notificationsSection.style.display = 'block';
             setTimeout(() => { notificationsSection.style.opacity = '1'; }, 10);
             loadNotificationSettings();
+        } else if (section === 'terraform-cloud') {
+            terraformCloudSection.style.display = 'block';
+            setTimeout(() => { terraformCloudSection.style.opacity = '1'; }, 10);
         }
     }, 300);
 }
@@ -1104,6 +1108,401 @@ function displayStateAnalysis(analysis) {
 
     // Smooth scroll to results
     resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ===== Terraform Cloud Functions =====
+
+// Store Terraform Cloud config globally
+let tfcConfig = {
+    apiToken: '',
+    organization: '',
+    baseUrl: 'https://app.terraform.io/api/v2'
+};
+
+// Store workspaces globally
+let tfcWorkspaces = [];
+
+// Get Terraform Cloud configuration from form
+function getTerraformCloudConfig() {
+    return {
+        api_token: document.getElementById('tfcApiToken').value,
+        organization: document.getElementById('tfcOrganization').value,
+        base_url: document.getElementById('tfcBaseUrl').value || 'https://app.terraform.io/api/v2'
+    };
+}
+
+// Test Terraform Cloud connection
+async function testTerraformCloudConnection() {
+    const config = getTerraformCloudConfig();
+
+    if (!config.api_token || !config.organization) {
+        Toast.error('Please enter API token and organization name');
+        return;
+    }
+
+    try {
+        Toast.info('Testing connection...');
+
+        const response = await fetch(`${API_BASE}/terraform/cloud/test?` + new URLSearchParams({
+            api_token: config.api_token,
+            organization: config.organization,
+            base_url: config.base_url
+        }));
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Connection test failed');
+        }
+
+        const result = await response.json();
+
+        // Show success status
+        const statusDiv = document.getElementById('tfc-connection-status');
+        statusDiv.className = 'alert alert-success mb-4';
+        statusDiv.innerHTML = `
+            <h6><i class="bi bi-check-circle"></i> Connection Successful</h6>
+            <p class="mb-0">Connected to organization: <strong>${result.organization}</strong></p>
+            <p class="mb-0">Found ${result.workspace_count} workspace(s)</p>
+        `;
+        statusDiv.style.display = 'block';
+
+        Toast.success('Connection successful!');
+
+        // Store config
+        tfcConfig = config;
+
+    } catch (error) {
+        // Show error status
+        const statusDiv = document.getElementById('tfc-connection-status');
+        statusDiv.className = 'alert alert-danger mb-4';
+        statusDiv.innerHTML = `
+            <h6><i class="bi bi-x-circle"></i> Connection Failed</h6>
+            <p class="mb-0">${error.message}</p>
+        `;
+        statusDiv.style.display = 'block';
+
+        Toast.error(`Connection failed: ${error.message}`);
+    }
+}
+
+// Load Terraform Cloud workspaces
+async function loadTerraformCloudWorkspaces() {
+    const config = getTerraformCloudConfig();
+
+    if (!config.api_token || !config.organization) {
+        Toast.error('Please enter API token and organization name');
+        return;
+    }
+
+    try {
+        Toast.info('Loading workspaces...');
+        showLoading('Loading workspaces from Terraform Cloud...');
+
+        const response = await fetch(`${API_BASE}/terraform/cloud/workspaces`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to load workspaces');
+        }
+
+        const result = await response.json();
+        tfcWorkspaces = result.workspaces;
+
+        // Display workspaces
+        displayTerraformCloudWorkspaces(tfcWorkspaces);
+        Toast.success(`Loaded ${tfcWorkspaces.length} workspace(s)`);
+
+        // Show workspaces container
+        document.getElementById('tfc-workspaces-container').style.display = 'block';
+
+        // Store config
+        tfcConfig = config;
+
+    } catch (error) {
+        Toast.error(`Failed to load workspaces: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Display Terraform Cloud workspaces
+function displayTerraformCloudWorkspaces(workspaces) {
+    const listDiv = document.getElementById('workspaces-list');
+
+    if (workspaces.length === 0) {
+        listDiv.innerHTML = '<div class="alert alert-info">No workspaces found</div>';
+        return;
+    }
+
+    let html = '';
+    workspaces.forEach(workspace => {
+        const resourceCount = workspace.resource_count || 0;
+        const lastUpdated = workspace.updated_at ? new Date(workspace.updated_at).toLocaleDateString() : 'N/A';
+
+        html += `
+            <div class="list-group-item workspace-item" data-workspace-name="${workspace.name}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">${workspace.name}</h6>
+                        <small class="text-muted">
+                            <i class="bi bi-box"></i> ${resourceCount} resources &nbsp;
+                            <i class="bi bi-calendar"></i> Updated: ${lastUpdated}
+                        </small>
+                    </div>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewWorkspaceDetails('${workspace.name}')">
+                            <i class="bi bi-eye"></i> Details
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" onclick="analyzeWorkspace('${workspace.name}')">
+                            <i class="bi bi-search"></i> Analyze
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" onclick="validateWorkspace('${workspace.name}')">
+                            <i class="bi bi-check-circle"></i> Validate
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    listDiv.innerHTML = html;
+}
+
+// Filter workspaces by search
+function filterWorkspaces() {
+    const searchTerm = document.getElementById('workspaceSearch').value.toLowerCase();
+    const workspaceItems = document.querySelectorAll('.workspace-item');
+
+    workspaceItems.forEach(item => {
+        const workspaceName = item.getAttribute('data-workspace-name').toLowerCase();
+        if (workspaceName.includes(searchTerm)) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+// View workspace details
+async function viewWorkspaceDetails(workspaceName) {
+    try {
+        Toast.info('Loading workspace details...');
+        showLoading('Loading workspace details...');
+
+        const workspace = tfcWorkspaces.find(w => w.name === workspaceName);
+
+        if (!workspace) {
+            throw new Error('Workspace not found');
+        }
+
+        // Display details
+        const detailsDiv = document.getElementById('workspace-details-content');
+        let html = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Workspace Information</h6>
+                    <table class="table table-sm">
+                        <tr><th>Name:</th><td>${workspace.name}</td></tr>
+                        <tr><th>ID:</th><td><code>${workspace.id}</code></td></tr>
+                        <tr><th>Terraform Version:</th><td>${workspace.terraform_version || 'N/A'}</td></tr>
+                        <tr><th>Execution Mode:</th><td>${workspace.execution_mode || 'remote'}</td></tr>
+                        <tr><th>Auto Apply:</th><td>${workspace.auto_apply ? 'Yes' : 'No'}</td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6>Statistics</h6>
+                    <table class="table table-sm">
+                        <tr><th>Resource Count:</th><td>${workspace.resource_count || 0}</td></tr>
+                        <tr><th>Working Directory:</th><td>${workspace.working_directory || '/'}</td></tr>
+                        <tr><th>Created:</th><td>${new Date(workspace.created_at).toLocaleString()}</td></tr>
+                        <tr><th>Last Updated:</th><td>${new Date(workspace.updated_at).toLocaleString()}</td></tr>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        detailsDiv.innerHTML = html;
+        document.getElementById('tfc-workspace-details').style.display = 'block';
+
+        // Scroll to details
+        document.getElementById('tfc-workspace-details').scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        });
+
+    } catch (error) {
+        Toast.error(`Failed to load details: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Close workspace details
+function closeTerraformCloudWorkspaceDetails() {
+    document.getElementById('tfc-workspace-details').style.display = 'none';
+}
+
+// Analyze workspace
+async function analyzeWorkspace(workspaceName) {
+    try {
+        Toast.info('Analyzing workspace...');
+        showLoading('Analyzing workspace from Terraform Cloud...');
+
+        const response = await fetch(`${API_BASE}/terraform/cloud/workspace/analyze`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                workspace_name: workspaceName,
+                config: tfcConfig
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Analysis failed');
+        }
+
+        const result = await response.json();
+
+        // Display analysis results
+        if (result.has_state && result.analysis) {
+            displayWorkspaceAnalysis(result);
+            Toast.success('Workspace analysis complete!');
+        } else {
+            Toast.warning('Workspace has no state to analyze');
+        }
+
+    } catch (error) {
+        Toast.error(`Analysis failed: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Display workspace analysis
+function displayWorkspaceAnalysis(result) {
+    const contentDiv = document.getElementById('workspace-analysis-content');
+
+    const analysis = result.analysis;
+    const workspace = result.workspace;
+
+    let html = `
+        <h6>Workspace: ${workspace.name}</h6>
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <div class="card text-center bg-primary text-white">
+                    <div class="card-body">
+                        <h4 class="mb-0">${analysis.summary.total_resources}</h4>
+                        <small>Total Resources</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-info text-white">
+                    <div class="card-body">
+                        <h4 class="mb-0">${analysis.summary.resource_types}</h4>
+                        <small>Resource Types</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-success text-white">
+                    <div class="card-body">
+                        <h4 class="mb-0">${analysis.summary.modules}</h4>
+                        <small>Modules</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-secondary text-white">
+                    <div class="card-body">
+                        <h4 class="mb-0">${analysis.patterns_detected?.length || 0}</h4>
+                        <small>Patterns Detected</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Security Findings
+    if (analysis.security_findings && analysis.security_findings.length > 0) {
+        html += `
+            <div class="card mb-3">
+                <div class="card-header bg-warning">
+                    <h6 class="mb-0">Security Findings</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+        `;
+
+        analysis.security_findings.slice(0, 5).forEach(finding => {
+            html += `<li><span class="badge bg-${finding.severity === 'high' ? 'danger' : 'warning'}">${finding.severity}</span> ${finding.finding}</li>`;
+        });
+
+        html += `
+                    </ul>
+                </div>
+            </div>
+        `;
+    }
+
+    contentDiv.innerHTML = html;
+    document.getElementById('tfc-workspace-analysis').style.display = 'block';
+
+    // Scroll to results
+    document.getElementById('tfc-workspace-analysis').scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+    });
+}
+
+// Validate workspace
+async function validateWorkspace(workspaceName) {
+    try {
+        Toast.info('Validating workspace...');
+        showLoading('Running validation against workspace...');
+
+        const response = await fetch(`${API_BASE}/terraform/cloud/workspace/validate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                workspace_name: workspaceName,
+                config: tfcConfig
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Validation failed');
+        }
+
+        const report = await response.json();
+
+        // Display validation report (reuse existing function)
+        displayValidationReport(report);
+        Toast.success('Validation complete!');
+
+        // Scroll to results
+        document.getElementById('validation-results').scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        });
+
+    } catch (error) {
+        Toast.error(`Validation failed: ${error.message}`);
+    } finally{
+        hideLoading();
+    }
 }
 
 // Initialize on page load
