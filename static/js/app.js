@@ -864,6 +864,248 @@ async function sendManualNotification() {
     }
 }
 
+// ===== Terraform State File Functions =====
+
+// Analyze Terraform state file
+async function analyzeStateFile() {
+    const fileInput = document.getElementById('terraformStateFile');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        Toast.error('Please select a state file');
+        return;
+    }
+
+    try {
+        Toast.info('Analyzing state file...');
+        showLoading('Analyzing Terraform state...');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`${API_BASE}/terraform/state/analyze`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Analysis failed');
+        }
+
+        const result = await response.json();
+
+        displayStateAnalysis(result);
+        Toast.success('State analysis complete!');
+
+    } catch (error) {
+        Toast.error(`Analysis failed: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Validate Terraform state file
+async function validateStateFile() {
+    const fileInput = document.getElementById('terraformStateFile');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        Toast.error('Please select a state file');
+        return;
+    }
+
+    try {
+        Toast.info('Validating state file...');
+        showLoading('Running validation...');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`${API_BASE}/terraform/state/validate`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Validation failed');
+        }
+
+        const report = await response.json();
+
+        // Display validation report (reuse existing function)
+        displayValidationReport(report);
+        Toast.success('Validation complete!');
+
+        // Scroll to results
+        document.getElementById('validation-results').scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        });
+
+    } catch (error) {
+        Toast.error(`Validation failed: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Display state analysis results
+function displayStateAnalysis(analysis) {
+    const resultsDiv = document.getElementById('state-analysis-results');
+    const contentDiv = document.getElementById('state-analysis-content');
+
+    const summary = analysis.analysis.summary;
+    const stats = analysis.stats;
+    const patterns = analysis.analysis.patterns_detected || [];
+    const security = analysis.analysis.security_findings || [];
+    const costDrivers = analysis.analysis.cost_drivers || {};
+
+    let html = '<div class="row">';
+
+    // Summary Cards
+    html += `
+        <div class="col-md-3 mb-3">
+            <div class="card text-center bg-primary text-white">
+                <div class="card-body">
+                    <h3 class="mb-0">${summary.total_resources}</h3>
+                    <p class="mb-0">Total Resources</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center bg-info text-white">
+                <div class="card-body">
+                    <h3 class="mb-0">${summary.resource_types}</h3>
+                    <p class="mb-0">Resource Types</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center bg-success text-white">
+                <div class="card-body">
+                    <h3 class="mb-0">${summary.modules}</h3>
+                    <p class="mb-0">Modules</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center bg-secondary text-white">
+                <div class="card-body">
+                    <h3 class="mb-0">${summary.providers}</h3>
+                    <p class="mb-0">Providers</p>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    // Resource Categories
+    html += '<div class="card mb-3"><div class="card-header bg-primary text-white"><h6 class="mb-0">Resource Categories</h6></div><div class="card-body">';
+    html += '<div class="row">';
+
+    for (const [category, count] of Object.entries(stats.by_category)) {
+        html += `
+            <div class="col-md-4 mb-2">
+                <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+                    <span class="text-capitalize">${category}</span>
+                    <span class="badge bg-primary">${count}</span>
+                </div>
+            </div>
+        `;
+    }
+    html += '</div></div></div>';
+
+    // Detected Patterns
+    if (patterns.length > 0) {
+        html += '<div class="card mb-3"><div class="card-header bg-success text-white"><h6 class="mb-0">Detected Patterns</h6></div><div class="card-body">';
+        patterns.forEach(pattern => {
+            const confidence = (pattern.confidence * 100).toFixed(0);
+            html += `
+                <div class="alert alert-success mb-2">
+                    <strong>${pattern.name}</strong>
+                    <span class="badge bg-success float-end">${confidence}% confidence</span>
+                    <p class="mb-0 mt-2 small">${pattern.description}</p>
+                </div>
+            `;
+        });
+        html += '</div></div>';
+    }
+
+    // Security Findings
+    if (security.length > 0) {
+        html += '<div class="card mb-3"><div class="card-header bg-warning"><h6 class="mb-0">Security Findings</h6></div><div class="card-body">';
+        html += '<table class="table table-sm"><thead><tr><th>Severity</th><th>Resource</th><th>Finding</th></tr></thead><tbody>';
+        security.forEach(finding => {
+            const severityClass = {
+                'critical': 'danger',
+                'high': 'warning',
+                'medium': 'info',
+                'low': 'secondary'
+            }[finding.severity] || 'secondary';
+
+            html += `
+                <tr>
+                    <td><span class="badge bg-${severityClass}">${finding.severity.toUpperCase()}</span></td>
+                    <td><code>${finding.resource}</code></td>
+                    <td>${finding.finding}</td>
+                </tr>
+            `;
+        });
+        html += '</tbody></table></div></div>';
+    }
+
+    // Cost Drivers
+    if (costDrivers.summary) {
+        html += '<div class="card mb-3"><div class="card-header bg-info text-white"><h6 class="mb-0">Cost Drivers</h6></div><div class="card-body">';
+        html += '<div class="row">';
+        html += `
+            <div class="col-md-4 mb-2">
+                <div class="p-3 border rounded text-center">
+                    <h4 class="mb-0">${costDrivers.summary.compute_instances}</h4>
+                    <small>Compute Instances</small>
+                </div>
+            </div>
+            <div class="col-md-4 mb-2">
+                <div class="p-3 border rounded text-center">
+                    <h4 class="mb-0">${costDrivers.summary.databases}</h4>
+                    <small>Databases</small>
+                </div>
+            </div>
+            <div class="col-md-4 mb-2">
+                <div class="p-3 border rounded text-center">
+                    <h4 class="mb-0">${costDrivers.summary.storage_resources}</h4>
+                    <small>Storage Resources</small>
+                </div>
+            </div>
+        `;
+        html += '</div></div></div>';
+    }
+
+    // Mermaid Diagram
+    if (analysis.diagram && analysis.diagram.mermaid) {
+        html += `
+            <div class="card mb-3">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0">Resource Diagram</h6>
+                </div>
+                <div class="card-body">
+                    <pre class="bg-light p-3 rounded"><code>${analysis.diagram.mermaid}</code></pre>
+                    <p class="small text-muted mb-0">
+                        Copy this Mermaid diagram to <a href="https://mermaid.live" target="_blank">mermaid.live</a> to visualize
+                    </p>
+                </div>
+            </div>
+        `;
+    }
+
+    contentDiv.innerHTML = html;
+    resultsDiv.style.display = 'block';
+
+    // Smooth scroll to results
+    resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Architecture Validation System loaded');
