@@ -54,6 +54,29 @@ class DatabaseConfig(BaseSettings):
     echo: bool = False
 
 
+class EmailConfig(BaseSettings):
+    """Email notification configuration"""
+    enabled: bool = True
+    smtp_host: str = Field(default="smtp.gmail.com", env="SMTP_HOST")
+    smtp_port: int = Field(default=587, env="SMTP_PORT")
+    smtp_user: str = Field(default="", env="SMTP_USER")
+    smtp_password: str = Field(default="", env="SMTP_PASSWORD")
+    use_tls: bool = True
+    from_email: str = Field(default="noreply@compass.local", env="SMTP_FROM_EMAIL")
+    from_name: str = "Compass Validation System"
+
+    # Notification triggers
+    notify_on_failure: bool = True
+    notify_on_critical: bool = True
+    notify_on_success: bool = False
+
+    # Default recipients
+    default_recipients: List[str] = []
+
+    # Attachment options
+    attach_pdf_on_failure: bool = True
+
+
 class Settings(BaseSettings):
     """Main application settings"""
     app_env: str = Field(default="development", env="APP_ENV")
@@ -68,6 +91,7 @@ class Settings(BaseSettings):
     terraform: TerraformConfig = TerraformConfig()
     approval: ApprovalConfig = ApprovalConfig()
     database: DatabaseConfig = DatabaseConfig()
+    email: EmailConfig = EmailConfig()
 
     class Config:
         env_file = ".env"
@@ -106,6 +130,11 @@ def load_config(config_file: Optional[str] = None) -> Settings:
             env_dict.setdefault('SNOW_API_USER', '')
             env_dict.setdefault('SNOW_API_PASSWORD', '')
             env_dict.setdefault('DATABASE_URL', 'sqlite:///./architecture_validation.db')
+            env_dict.setdefault('SMTP_HOST', 'smtp.gmail.com')
+            env_dict.setdefault('SMTP_PORT', '587')
+            env_dict.setdefault('SMTP_USER', '')
+            env_dict.setdefault('SMTP_PASSWORD', '')
+            env_dict.setdefault('SMTP_FROM_EMAIL', 'noreply@compass.local')
 
             substituted_content = template.safe_substitute(env_dict)
             yaml_config = yaml.safe_load(substituted_content)
@@ -124,6 +153,8 @@ def load_config(config_file: Optional[str] = None) -> Settings:
                     settings.approval = ApprovalConfig(**yaml_config['approval']['routing'])
                 if 'database' in yaml_config:
                     settings.database = DatabaseConfig(**yaml_config['database'])
+                if 'notifications' in yaml_config and 'email' in yaml_config['notifications']:
+                    settings.email = EmailConfig(**yaml_config['notifications']['email'])
 
     return settings
 

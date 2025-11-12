@@ -49,3 +49,25 @@ database:
   url: "${DATABASE_URL}"
   pool_size: 5
   echo: false
+
+notifications:
+  email:
+    enabled: true
+    smtp_host: "${SMTP_HOST:smtp.gmail.com}"
+    smtp_port: "${SMTP_PORT:587}"
+    smtp_user: "${SMTP_USER}"
+    smtp_password: "${SMTP_PASSWORD}"
+    use_tls: true
+    from_email: "${SMTP_FROM_EMAIL:noreply@compass.local}"
+    from_name: "Compass Validation System"
+
+    # Automatic notification triggers
+    notify_on_failure: true
+    notify_on_critical: true
+    notify_on_success: false
+
+    # Default recipients for system notifications
+    default_recipients: []
+
+    # Attach PDF report to failure notifications
+    attach_pdf_on_failure: true

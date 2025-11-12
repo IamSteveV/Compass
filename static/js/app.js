@@ -87,9 +87,10 @@ const ProgressBar = {
 function showSection(section) {
     const validateSection = document.getElementById('validate-section');
     const patternsSection = document.getElementById('patterns-section');
+    const notificationsSection = document.getElementById('notifications-section');
 
     // Fade out current section
-    [validateSection, patternsSection].forEach(s => {
+    [validateSection, patternsSection, notificationsSection].forEach(s => {
         if (s.style.display !== 'none') {
             s.style.opacity = '0';
             setTimeout(() => {
@@ -107,6 +108,10 @@ function showSection(section) {
             patternsSection.style.display = 'block';
             setTimeout(() => { patternsSection.style.opacity = '1'; }, 10);
             loadPatterns();
+        } else if (section === 'notifications') {
+            notificationsSection.style.display = 'block';
+            setTimeout(() => { notificationsSection.style.opacity = '1'; }, 10);
+            loadNotificationSettings();
         }
     }, 300);
 }
@@ -462,6 +467,12 @@ function displayValidationReport(report) {
     // Store report for copy/download
     window.currentReport = report;
 
+    // Enable manual notification button
+    const sendNotificationBtn = document.getElementById('sendNotificationBtn');
+    if (sendNotificationBtn) {
+        sendNotificationBtn.disabled = false;
+    }
+
     // Fade in results
     resultsDiv.style.display = 'none';
     resultsDiv.style.opacity = '0';
@@ -687,6 +698,169 @@ async function showPatternDetails(patternId) {
         alert(`Error loading pattern details: ${error.message}`);
     } finally {
         hideLoading();
+    }
+}
+
+// ===== Notification Functions =====
+
+// Load notification settings
+async function loadNotificationSettings() {
+    try {
+        const response = await fetch(`${API_BASE}/notifications/settings`);
+        const settings = await response.json();
+
+        const statusBadge = settings.enabled
+            ? '<span class="badge bg-success">Enabled</span>'
+            : '<span class="badge bg-danger">Disabled</span>';
+
+        const html = `
+            <table class="table table-sm">
+                <tr>
+                    <th class="text-end" style="width: 40%;">Status:</th>
+                    <td>${statusBadge}</td>
+                </tr>
+                <tr>
+                    <th class="text-end">SMTP Host:</th>
+                    <td><code>${settings.smtp_host}</code></td>
+                </tr>
+                <tr>
+                    <th class="text-end">SMTP Port:</th>
+                    <td><code>${settings.smtp_port}</code></td>
+                </tr>
+                <tr>
+                    <th class="text-end">From Email:</th>
+                    <td><code>${settings.from_email}</code></td>
+                </tr>
+                <tr>
+                    <th class="text-end">From Name:</th>
+                    <td>${settings.from_name}</td>
+                </tr>
+                <tr>
+                    <th class="text-end">Notify on Failure:</th>
+                    <td>${settings.notify_on_failure ? '✅ Yes' : '❌ No'}</td>
+                </tr>
+                <tr>
+                    <th class="text-end">Notify on Critical:</th>
+                    <td>${settings.notify_on_critical ? '✅ Yes' : '❌ No'}</td>
+                </tr>
+                <tr>
+                    <th class="text-end">Notify on Success:</th>
+                    <td>${settings.notify_on_success ? '✅ Yes' : '❌ No'}</td>
+                </tr>
+            </table>
+        `;
+
+        document.getElementById('notification-settings').innerHTML = html;
+    } catch (error) {
+        document.getElementById('notification-settings').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> Failed to load notification settings: ${error.message}
+            </div>
+        `;
+    }
+}
+
+// Send test email
+async function sendTestEmail() {
+    const recipient = document.getElementById('testEmailRecipient').value;
+    const subject = document.getElementById('testEmailSubject').value;
+    const body = document.getElementById('testEmailBody').value;
+
+    if (!recipient) {
+        Toast.error('Please enter a recipient email address');
+        return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recipient)) {
+        Toast.error('Please enter a valid email address');
+        return;
+    }
+
+    try {
+        Toast.info('Sending test email...');
+
+        const response = await fetch(`${API_BASE}/notifications/test`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                recipient: recipient,
+                subject: subject || undefined,
+                body: body || undefined
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to send test email');
+        }
+
+        const result = await response.json();
+        Toast.success(result.message || 'Test email sent successfully!');
+    } catch (error) {
+        Toast.error(`Failed to send test email: ${error.message}`);
+    }
+}
+
+// Send manual notification
+async function sendManualNotification() {
+    const recipientsInput = document.getElementById('notificationRecipients').value;
+    const includePDF = document.getElementById('includePDF').checked;
+
+    if (!recipientsInput) {
+        Toast.error('Please enter at least one recipient email address');
+        return;
+    }
+
+    // Parse recipients (comma-separated)
+    const recipients = recipientsInput.split(',').map(e => e.trim()).filter(e => e);
+
+    if (recipients.length === 0) {
+        Toast.error('Please enter valid email addresses');
+        return;
+    }
+
+    // Validate each email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    for (const email of recipients) {
+        if (!emailRegex.test(email)) {
+            Toast.error(`Invalid email address: ${email}`);
+            return;
+        }
+    }
+
+    if (!window.currentReport) {
+        Toast.error('No validation report available. Please complete a validation first.');
+        return;
+    }
+
+    try {
+        Toast.info('Sending notification...');
+
+        const response = await fetch(`${API_BASE}/notifications/send-validation-report`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                report: window.currentReport,
+                recipients: recipients,
+                include_pdf: includePDF
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to send notification');
+        }
+
+        const result = await response.json();
+        Toast.success(result.message || 'Notification sent successfully!');
+    } catch (error) {
+        Toast.error(`Failed to send notification: ${error.message}`);
     }
 }
 

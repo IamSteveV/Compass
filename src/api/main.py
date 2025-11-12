@@ -11,7 +11,7 @@ from typing import List, Optional
 import logging
 
 from ..config import get_settings
-from .routers import patterns, validation, cmdb, analytics, history, reports
+from .routers import patterns, validation, cmdb, analytics, history, reports, notifications
 from ..database.session import init_db
 
 # Configure logging
@@ -58,6 +58,7 @@ app.include_router(cmdb.router, prefix="/api/cmdb", tags=["cmdb"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(history.router, prefix="/api/history", tags=["history"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 
 # Serve static files for frontend
 static_path = Path(__file__).parent.parent.parent / "static"
@@ -156,6 +157,7 @@ async def api_info():
             "analytics": "/api/analytics",
             "history": "/api/history",
             "reports": "/api/reports",
+            "notifications": "/api/notifications",
             "health": "/health",
             "metrics": "/metrics"
         }
