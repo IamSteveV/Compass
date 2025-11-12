@@ -636,28 +636,65 @@ function getApprovalTrackBadge(track) {
     return badges[track] || track;
 }
 
+// ==========================================
+// Pattern Management Functions
+// ==========================================
+
+// Global state for pattern management
+let currentPatterns = [];
+let currentEditingPattern = null;
+let patternComponents = { required: [], optional: [] };
+let patternRelationships = [];
+
 // Load patterns
 async function loadPatterns() {
     showLoading();
 
     try {
-        const response = await fetch(`${API_BASE}/patterns/?status=approved`);
+        const response = await fetch(`${API_BASE}/patterns/`);
         const patterns = await response.json();
+        currentPatterns = patterns;
 
         const listDiv = document.getElementById('patterns-list');
         listDiv.innerHTML = '';
 
+        if (patterns.length === 0) {
+            listDiv.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        No patterns found. Click "Create New Pattern" to add your first pattern.
+                    </div>
+                </div>
+            `;
+            hideLoading();
+            return;
+        }
+
         patterns.forEach(pattern => {
             const card = document.createElement('div');
-            card.className = 'col-md-4 mb-3';
+            card.className = 'col-md-4 mb-3 pattern-item';
+            card.setAttribute('data-pattern-name', pattern.metadata.name.toLowerCase());
+            card.setAttribute('data-pattern-category', pattern.metadata.category || '');
             card.innerHTML = `
-                <div class="card pattern-card" onclick="showPatternDetails('${pattern.metadata.id}')">
+                <div class="card h-100">
                     <div class="card-body">
                         <h5 class="card-title">${pattern.metadata.name}</h5>
                         <p class="card-text text-muted">${pattern.metadata.description.substring(0, 100)}...</p>
-                        <div>
+                        <div class="mb-2">
                             <span class="badge bg-primary">${pattern.metadata.id}</span>
                             <span class="badge bg-success">v${pattern.metadata.version}</span>
+                            ${pattern.metadata.category ? `<span class="badge bg-info">${pattern.metadata.category}</span>` : ''}
+                        </div>
+                        <div class="btn-group w-100" role="group">
+                            <button class="btn btn-sm btn-outline-primary" onclick="showPatternDetails('${pattern.metadata.id}')">
+                                <i class="bi bi-eye"></i> View
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="editPattern('${pattern.metadata.id}')">
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deletePattern('${pattern.metadata.id}')">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -665,10 +702,28 @@ async function loadPatterns() {
             listDiv.appendChild(card);
         });
     } catch (error) {
-        alert(`Error loading patterns: ${error.message}`);
+        Toast.error(`Error loading patterns: ${error.message}`);
     } finally {
         hideLoading();
     }
+}
+
+// Filter patterns
+function filterPatterns() {
+    const searchTerm = document.getElementById('pattern-search').value.toLowerCase();
+    const categoryFilter = document.getElementById('pattern-category-filter').value;
+
+    const items = document.querySelectorAll('.pattern-item');
+
+    items.forEach(item => {
+        const name = item.getAttribute('data-pattern-name');
+        const category = item.getAttribute('data-pattern-category');
+
+        const matchesSearch = !searchTerm || name.includes(searchTerm);
+        const matchesCategory = !categoryFilter || category === categoryFilter;
+
+        item.style.display = (matchesSearch && matchesCategory) ? '' : 'none';
+    });
 }
 
 // Show pattern details
@@ -679,13 +734,15 @@ async function showPatternDetails(patternId) {
         const response = await fetch(`${API_BASE}/patterns/${patternId}`);
         const pattern = await response.json();
 
+        currentEditingPattern = pattern;
+
         document.getElementById('patternModalTitle').textContent = pattern.metadata.name;
 
         let html = `
             <div class="mb-3">
                 <strong>ID:</strong> ${pattern.metadata.id} |
                 <strong>Version:</strong> ${pattern.metadata.version} |
-                <strong>Status:</strong> <span class="badge bg-success">${pattern.metadata.status}</span>
+                <strong>Status:</strong> <span class="badge bg-success">${pattern.metadata.status || 'Active'}</span>
             </div>
             <div class="mb-3">
                 <h6>Description</h6>
@@ -694,21 +751,477 @@ async function showPatternDetails(patternId) {
             <div class="mb-3">
                 <h6>Components</h6>
                 <ul>
-                    ${pattern.architecture.components.map(c => `<li><strong>${c.name}</strong> (${c.type})</li>`).join('')}
+                    ${pattern.architecture.components.map(c => `
+                        <li>
+                            <strong>${c.name}</strong> (${c.type})
+                            ${c.required ? '<span class="badge bg-danger">Required</span>' : '<span class="badge bg-secondary">Optional</span>'}
+                        </li>
+                    `).join('')}
                 </ul>
-            </div>
-            <div class="mb-3">
-                <h6>Terraform Module</h6>
-                <code>${pattern.implementation.terraform_module}</code>
             </div>
         `;
 
+        if (pattern.architecture.relationships && pattern.architecture.relationships.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <h6>Relationships</h6>
+                    <ul>
+                        ${pattern.architecture.relationships.map(r => `
+                            <li><code>${r.from}</code> → <code>${r.to}</code> (${r.type})</li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        if (pattern.implementation && pattern.implementation.terraform_module) {
+            html += `
+                <div class="mb-3">
+                    <h6>Terraform Module</h6>
+                    <code>${pattern.implementation.terraform_module}</code>
+                </div>
+            `;
+        }
+
+        if (pattern.metadata.tags) {
+            html += `
+                <div class="mb-3">
+                    <h6>Tags</h6>
+                    ${pattern.metadata.tags.map(tag => `<span class="badge bg-secondary">${tag}</span>`).join(' ')}
+                </div>
+            `;
+        }
+
         document.getElementById('patternModalBody').innerHTML = html;
+
+        // Set button attributes for edit/delete
+        document.getElementById('edit-pattern-btn').setAttribute('data-pattern-id', patternId);
+        document.getElementById('delete-pattern-btn').setAttribute('data-pattern-id', patternId);
 
         const modal = new bootstrap.Modal(document.getElementById('patternModal'));
         modal.show();
     } catch (error) {
-        alert(`Error loading pattern details: ${error.message}`);
+        Toast.error(`Error loading pattern details: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Show create pattern modal
+function showCreatePatternModal() {
+    currentEditingPattern = null;
+    patternComponents = { required: [], optional: [] };
+    patternRelationships = [];
+
+    document.getElementById('patternEditModalTitle').textContent = 'Create New Pattern';
+    document.getElementById('pattern-form').reset();
+    document.getElementById('pattern-version').value = '1.0.0';
+
+    // Clear dynamic lists
+    document.getElementById('required-components-list').innerHTML = '';
+    document.getElementById('optional-components-list').innerHTML = '';
+    document.getElementById('relationships-list').innerHTML = '';
+    document.getElementById('pattern-json-preview').style.display = 'none';
+
+    const modal = new bootstrap.Modal(document.getElementById('patternEditModal'));
+    modal.show();
+}
+
+// Edit pattern
+async function editPattern(patternId) {
+    try {
+        showLoading();
+        const response = await fetch(`${API_BASE}/patterns/${patternId}`);
+        const pattern = await response.json();
+
+        currentEditingPattern = pattern;
+
+        // Populate form
+        document.getElementById('patternEditModalTitle').textContent = 'Edit Pattern';
+        document.getElementById('pattern-name').value = pattern.metadata.name;
+        document.getElementById('pattern-version').value = pattern.metadata.version;
+        document.getElementById('pattern-description').value = pattern.metadata.description;
+        document.getElementById('pattern-category').value = pattern.metadata.category || 'web';
+        document.getElementById('pattern-environment').value = pattern.metadata.environment || '';
+        document.getElementById('pattern-author').value = pattern.metadata.author || '';
+        document.getElementById('pattern-tags').value = pattern.metadata.tags ? pattern.metadata.tags.join(', ') : '';
+
+        // Populate components
+        patternComponents.required = pattern.architecture.components.filter(c => c.required) || [];
+        patternComponents.optional = pattern.architecture.components.filter(c => !c.required) || [];
+        renderComponentLists();
+
+        // Populate relationships
+        patternRelationships = pattern.architecture.relationships || [];
+        renderRelationshipsList();
+
+        const modal = new bootstrap.Modal(document.getElementById('patternEditModal'));
+        modal.show();
+    } catch (error) {
+        Toast.error(`Error loading pattern for editing: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Edit pattern from view modal
+function editPatternFromView() {
+    const patternId = document.getElementById('edit-pattern-btn').getAttribute('data-pattern-id');
+    bootstrap.Modal.getInstance(document.getElementById('patternModal')).hide();
+    editPattern(patternId);
+}
+
+// Delete pattern
+async function deletePattern(patternId) {
+    if (!confirm('Are you sure you want to delete this pattern? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        Toast.info('Deleting pattern...');
+        showLoading();
+
+        const response = await fetch(`${API_BASE}/patterns/${patternId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete pattern');
+        }
+
+        Toast.success('Pattern deleted successfully!');
+        await loadPatterns();
+
+    } catch (error) {
+        Toast.error(`Failed to delete pattern: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Delete pattern from view modal
+function deletePatternFromView() {
+    const patternId = document.getElementById('delete-pattern-btn').getAttribute('data-pattern-id');
+    bootstrap.Modal.getInstance(document.getElementById('patternModal')).hide();
+    deletePattern(patternId);
+}
+
+// Add required component
+function addRequiredComponent() {
+    patternComponents.required.push({
+        name: '',
+        type: '',
+        count: { min: 1, max: 1 }
+    });
+    renderComponentLists();
+}
+
+// Add optional component
+function addOptionalComponent() {
+    patternComponents.optional.push({
+        name: '',
+        type: '',
+        count: { min: 0, max: null }
+    });
+    renderComponentLists();
+}
+
+// Remove component
+function removeComponent(type, index) {
+    if (type === 'required') {
+        patternComponents.required.splice(index, 1);
+    } else {
+        patternComponents.optional.splice(index, 1);
+    }
+    renderComponentLists();
+}
+
+// Render component lists
+function renderComponentLists() {
+    // Render required components
+    const requiredList = document.getElementById('required-components-list');
+    requiredList.innerHTML = '';
+
+    patternComponents.required.forEach((comp, idx) => {
+        const div = document.createElement('div');
+        div.className = 'card mb-2';
+        div.innerHTML = `
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-5">
+                        <input type="text" class="form-control" placeholder="Component name"
+                               value="${comp.name}" onchange="updateComponent('required', ${idx}, 'name', this.value)">
+                    </div>
+                    <div class="col-md-5">
+                        <input type="text" class="form-control" placeholder="Resource type (e.g., aws_instance)"
+                               value="${comp.type}" onchange="updateComponent('required', ${idx}, 'type', this.value)">
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-danger btn-sm w-100" onclick="removeComponent('required', ${idx})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        requiredList.appendChild(div);
+    });
+
+    // Render optional components
+    const optionalList = document.getElementById('optional-components-list');
+    optionalList.innerHTML = '';
+
+    patternComponents.optional.forEach((comp, idx) => {
+        const div = document.createElement('div');
+        div.className = 'card mb-2';
+        div.innerHTML = `
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-5">
+                        <input type="text" class="form-control" placeholder="Component name"
+                               value="${comp.name}" onchange="updateComponent('optional', ${idx}, 'name', this.value)">
+                    </div>
+                    <div class="col-md-5">
+                        <input type="text" class="form-control" placeholder="Resource type (e.g., aws_s3_bucket)"
+                               value="${comp.type}" onchange="updateComponent('optional', ${idx}, 'type', this.value)">
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-danger btn-sm w-100" onclick="removeComponent('optional', ${idx})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        optionalList.appendChild(div);
+    });
+}
+
+// Update component
+function updateComponent(type, index, field, value) {
+    if (type === 'required') {
+        patternComponents.required[index][field] = value;
+    } else {
+        patternComponents.optional[index][field] = value;
+    }
+}
+
+// Add relationship
+function addRelationship() {
+    patternRelationships.push({
+        from: '',
+        to: '',
+        type: 'depends_on'
+    });
+    renderRelationshipsList();
+}
+
+// Remove relationship
+function removeRelationship(index) {
+    patternRelationships.splice(index, 1);
+    renderRelationshipsList();
+}
+
+// Render relationships list
+function renderRelationshipsList() {
+    const list = document.getElementById('relationships-list');
+    list.innerHTML = '';
+
+    patternRelationships.forEach((rel, idx) => {
+        const div = document.createElement('div');
+        div.className = 'card mb-2';
+        div.innerHTML = `
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" placeholder="From component"
+                               value="${rel.from}" onchange="updateRelationship(${idx}, 'from', this.value)">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" onchange="updateRelationship(${idx}, 'type', this.value)">
+                            <option value="depends_on" ${rel.type === 'depends_on' ? 'selected' : ''}>Depends On</option>
+                            <option value="connects_to" ${rel.type === 'connects_to' ? 'selected' : ''}>Connects To</option>
+                            <option value="contains" ${rel.type === 'contains' ? 'selected' : ''}>Contains</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" placeholder="To component"
+                               value="${rel.to}" onchange="updateRelationship(${idx}, 'to', this.value)">
+                    </div>
+                    <div class="col-md-1">
+                        <button class="btn btn-danger btn-sm w-100" onclick="removeRelationship(${idx})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        list.appendChild(div);
+    });
+}
+
+// Update relationship
+function updateRelationship(index, field, value) {
+    patternRelationships[index][field] = value;
+}
+
+// Preview pattern JSON
+function previewPatternJSON() {
+    const pattern = buildPatternFromForm();
+    const preview = document.getElementById('pattern-json-preview');
+    preview.textContent = JSON.stringify(pattern, null, 2);
+    preview.style.display = 'block';
+}
+
+// Build pattern object from form
+function buildPatternFromForm() {
+    const allComponents = [
+        ...patternComponents.required.map(c => ({ ...c, required: true })),
+        ...patternComponents.optional.map(c => ({ ...c, required: false }))
+    ];
+
+    const tags = document.getElementById('pattern-tags').value
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+
+    return {
+        metadata: {
+            id: currentEditingPattern ? currentEditingPattern.metadata.id : '',
+            name: document.getElementById('pattern-name').value,
+            version: document.getElementById('pattern-version').value,
+            description: document.getElementById('pattern-description').value,
+            category: document.getElementById('pattern-category').value,
+            environment: document.getElementById('pattern-environment').value || null,
+            author: document.getElementById('pattern-author').value || 'Unknown',
+            tags: tags,
+            status: 'approved'
+        },
+        architecture: {
+            components: allComponents,
+            relationships: patternRelationships
+        },
+        implementation: {
+            terraform_module: ''
+        }
+    };
+}
+
+// Test pattern
+async function testPattern() {
+    try {
+        const pattern = buildPatternFromForm();
+
+        if (!pattern.metadata.name) {
+            Toast.warning('Please provide a pattern name');
+            return;
+        }
+
+        Toast.info('Testing pattern...');
+        showLoading();
+
+        const response = await fetch(`${API_BASE}/patterns/test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pattern)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Pattern test failed');
+        }
+
+        const result = await response.json();
+
+        // Show test results
+        const resultsDiv = document.getElementById('pattern-test-results');
+        resultsDiv.innerHTML = `
+            <div class="alert alert-success">
+                <h6><i class="bi bi-check-circle"></i> Pattern is valid!</h6>
+                <p>The pattern structure is correct and can be saved.</p>
+            </div>
+            <h6>Pattern Summary:</h6>
+            <ul>
+                <li><strong>Components:</strong> ${pattern.architecture.components.length}</li>
+                <li><strong>Relationships:</strong> ${pattern.architecture.relationships.length}</li>
+                <li><strong>Required Resources:</strong> ${pattern.architecture.components.filter(c => c.required).length}</li>
+            </ul>
+        `;
+
+        const testModal = new bootstrap.Modal(document.getElementById('patternTestModal'));
+        testModal.show();
+
+        Toast.success('Pattern validation passed!');
+
+    } catch (error) {
+        const resultsDiv = document.getElementById('pattern-test-results');
+        resultsDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <h6><i class="bi bi-x-circle"></i> Pattern validation failed</h6>
+                <p>${error.message}</p>
+            </div>
+        `;
+
+        const testModal = new bootstrap.Modal(document.getElementById('patternTestModal'));
+        testModal.show();
+
+        Toast.error(`Pattern test failed: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Save pattern
+async function savePattern() {
+    try {
+        const pattern = buildPatternFromForm();
+
+        if (!pattern.metadata.name) {
+            Toast.warning('Please provide a pattern name');
+            return;
+        }
+
+        if (pattern.architecture.components.length === 0) {
+            Toast.warning('Please add at least one component');
+            return;
+        }
+
+        Toast.info('Saving pattern...');
+        showLoading();
+
+        let response;
+        if (currentEditingPattern) {
+            // Update existing pattern
+            response = await fetch(`${API_BASE}/patterns/${currentEditingPattern.metadata.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(pattern)
+            });
+        } else {
+            // Create new pattern
+            response = await fetch(`${API_BASE}/patterns/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(pattern)
+            });
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save pattern');
+        }
+
+        const savedPattern = await response.json();
+
+        Toast.success(`Pattern ${currentEditingPattern ? 'updated' : 'created'} successfully!`);
+
+        // Close modal and reload patterns
+        bootstrap.Modal.getInstance(document.getElementById('patternEditModal')).hide();
+        await loadPatterns();
+
+    } catch (error) {
+        Toast.error(`Failed to save pattern: ${error.message}`);
     } finally {
         hideLoading();
     }

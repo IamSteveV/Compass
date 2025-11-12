@@ -159,14 +159,45 @@
 
         <!-- Patterns Section -->
         <div id="patterns-section" style="display: none;">
-            <h2>Architecture Patterns</h2>
-            <p class="text-muted">Browse approved architecture patterns</p>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>Architecture Patterns</h2>
+                    <p class="text-muted">Manage and browse approved architecture patterns</p>
+                </div>
+                <button class="btn btn-success" onclick="showCreatePatternModal()">
+                    <i class="bi bi-plus-circle"></i> Create New Pattern
+                </button>
+            </div>
 
+            <!-- Pattern Search and Filter -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <input type="text" class="form-control" id="pattern-search"
+                                   placeholder="Search patterns..." onkeyup="filterPatterns()">
+                        </div>
+                        <div class="col-md-6">
+                            <select class="form-select" id="pattern-category-filter" onchange="filterPatterns()">
+                                <option value="">All Categories</option>
+                                <option value="web">Web Application</option>
+                                <option value="api">API Service</option>
+                                <option value="database">Database</option>
+                                <option value="microservice">Microservice</option>
+                                <option value="serverless">Serverless</option>
+                                <option value="data">Data Pipeline</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Patterns List -->
             <div id="patterns-list" class="row">
                 <!-- Patterns will be loaded here -->
             </div>
 
-            <!-- Pattern Detail Modal -->
+            <!-- Pattern Detail/View Modal -->
             <div class="modal fade" id="patternModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
@@ -176,6 +207,151 @@
                         </div>
                         <div class="modal-body" id="patternModalBody">
                             <!-- Pattern details will be loaded here -->
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-primary" id="edit-pattern-btn" onclick="editPatternFromView()">
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                            <button type="button" class="btn btn-danger" id="delete-pattern-btn" onclick="deletePatternFromView()">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pattern Create/Edit Modal -->
+            <div class="modal fade" id="patternEditModal" tabindex="-1">
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="patternEditModalTitle">Create Pattern</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="pattern-form">
+                                <!-- Basic Information -->
+                                <h6>Basic Information</h6>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label for="pattern-name" class="form-label">Pattern Name *</label>
+                                        <input type="text" class="form-control" id="pattern-name" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="pattern-version" class="form-label">Version *</label>
+                                        <input type="text" class="form-control" id="pattern-version" value="1.0.0" required>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="pattern-description" class="form-label">Description *</label>
+                                    <textarea class="form-control" id="pattern-description" rows="3" required></textarea>
+                                </div>
+
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label for="pattern-category" class="form-label">Category</label>
+                                        <select class="form-select" id="pattern-category">
+                                            <option value="web">Web Application</option>
+                                            <option value="api">API Service</option>
+                                            <option value="database">Database</option>
+                                            <option value="microservice">Microservice</option>
+                                            <option value="serverless">Serverless</option>
+                                            <option value="data">Data Pipeline</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="pattern-environment" class="form-label">Environment</label>
+                                        <select class="form-select" id="pattern-environment">
+                                            <option value="">Any</option>
+                                            <option value="production">Production</option>
+                                            <option value="staging">Staging</option>
+                                            <option value="development">Development</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Required Components -->
+                                <h6 class="mt-4">Required Components</h6>
+                                <p class="text-muted">Define the resources that must be present in this pattern</p>
+                                <div id="required-components-list" class="mb-3">
+                                    <!-- Component list will be rendered here -->
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRequiredComponent()">
+                                    <i class="bi bi-plus"></i> Add Component
+                                </button>
+
+                                <!-- Optional Components -->
+                                <h6 class="mt-4">Optional Components</h6>
+                                <p class="text-muted">Define resources that may be present but are not required</p>
+                                <div id="optional-components-list" class="mb-3">
+                                    <!-- Component list will be rendered here -->
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addOptionalComponent()">
+                                    <i class="bi bi-plus"></i> Add Component
+                                </button>
+
+                                <!-- Relationships -->
+                                <h6 class="mt-4">Component Relationships</h6>
+                                <p class="text-muted">Define how components should be connected</p>
+                                <div id="relationships-list" class="mb-3">
+                                    <!-- Relationships will be rendered here -->
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRelationship()">
+                                    <i class="bi bi-plus"></i> Add Relationship
+                                </button>
+
+                                <!-- Metadata -->
+                                <h6 class="mt-4">Metadata</h6>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="pattern-author" class="form-label">Author</label>
+                                        <input type="text" class="form-control" id="pattern-author">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="pattern-tags" class="form-label">Tags (comma-separated)</label>
+                                        <input type="text" class="form-control" id="pattern-tags"
+                                               placeholder="aws, high-availability, multi-tier">
+                                    </div>
+                                </div>
+
+                                <!-- JSON Preview -->
+                                <h6 class="mt-4">JSON Preview</h6>
+                                <div class="mb-3">
+                                    <button type="button" class="btn btn-sm btn-info" onclick="previewPatternJSON()">
+                                        <i class="bi bi-eye"></i> Preview JSON
+                                    </button>
+                                </div>
+                                <pre id="pattern-json-preview" class="bg-light p-3" style="display: none; max-height: 300px; overflow: auto;"></pre>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-info" onclick="testPattern()">
+                                <i class="bi bi-play-circle"></i> Test Pattern
+                            </button>
+                            <button type="button" class="btn btn-success" onclick="savePattern()">
+                                <i class="bi bi-check-circle"></i> Save Pattern
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pattern Test Results Modal -->
+            <div class="modal fade" id="patternTestModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Pattern Test Results</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body" id="pattern-test-results">
+                            <!-- Test results will be shown here -->
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
                 </div>
