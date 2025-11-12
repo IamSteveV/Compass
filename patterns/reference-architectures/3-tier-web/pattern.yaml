@@ -1,0 +1,119 @@
+pattern:
+  id: "PAT-001"
+  name: "Standard 3-Tier Web Application"
+  version: "1.0"
+  status: "approved"
+  owner: "Enterprise Architecture Team"
+  approval_date: "2024-01-15"
+  compliance_tags:
+    - "PCI-DSS"
+    - "SOX"
+    - "SOC2"
+  description: |
+    Standard 3-tier web application architecture with separate presentation,
+    application, and data tiers. Includes load balancing, multi-AZ deployment,
+    and proper network segmentation.
+
+architecture:
+  components:
+    - name: "web_tier"
+      type: "server"
+      tier: "web"
+      minimum_instances: 2
+      load_balanced: true
+      properties:
+        instance_type: "t3.medium"
+        os: "Amazon Linux 2"
+
+    - name: "app_tier"
+      type: "server"
+      tier: "app"
+      minimum_instances: 2
+      load_balanced: true
+      properties:
+        instance_type: "t3.large"
+        os: "Amazon Linux 2"
+
+    - name: "database_tier"
+      type: "database"
+      tier: "database"
+      minimum_instances: 1
+      properties:
+        engine: "postgresql"
+        engine_version: "14"
+        instance_type: "r5.large"
+        multi_az: true
+        encrypted: true
+        backup_retention: 7
+
+    - name: "load_balancer"
+      type: "load_balancer"
+      tier: "web"
+      properties:
+        type: "application"
+        scheme: "internet-facing"
+
+  network_topology:
+    - source: "load_balancer"
+      target: "web_tier"
+      protocol: "https"
+      port: 443
+
+    - source: "web_tier"
+      target: "app_tier"
+      protocol: "https"
+      port: 8443
+
+    - source: "app_tier"
+      target: "database_tier"
+      protocol: "postgresql"
+      port: 5432
+
+  constraints:
+    - description: "Web tier MUST NOT directly access database tier"
+      type: "must_not"
+
+    - description: "All production databases MUST be encrypted"
+      type: "must"
+
+    - description: "Production deployment MUST be multi-AZ"
+      type: "must"
+
+    - description: "Web tier SHOULD use HTTPS only"
+      type: "should"
+
+implementation:
+  terraform_module: "git::https://github.com/example/patterns.git//3-tier-web?ref=v1.0"
+  required_variables:
+    - "application_name"
+    - "environment"
+    - "owner"
+    - "vpc_id"
+    - "subnet_ids"
+  optional_variables:
+    - "web_instance_type"
+    - "app_instance_type"
+    - "db_instance_type"
+    - "backup_retention_days"
+  example_usage: |
+    module "web_application" {
+      source = "git::https://github.com/example/patterns.git//3-tier-web?ref=v1.0"
+
+      application_name = "my-web-app"
+      environment      = "production"
+      owner           = "engineering-team"
+      vpc_id          = "vpc-12345678"
+      subnet_ids      = ["subnet-1", "subnet-2", "subnet-3"]
+
+      web_instance_type = "t3.medium"
+      app_instance_type = "t3.large"
+      db_instance_type  = "r5.large"
+      backup_retention_days = 7
+    }
+
+documentation:
+  diagram: "diagram.png"
+  adr: "https://wiki.example.com/adr/PAT-001"
+  runbook: "https://wiki.example.com/runbooks/3-tier-web"
+  examples:
+    - "https://github.com/example/examples/tree/main/3-tier-web"

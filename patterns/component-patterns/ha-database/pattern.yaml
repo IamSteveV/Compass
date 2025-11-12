@@ -1,0 +1,88 @@
+pattern:
+  id: "COMP-001"
+  name: "High Availability Database"
+  version: "1.0"
+  status: "approved"
+  owner: "Database Team"
+  approval_date: "2024-01-20"
+  compliance_tags:
+    - "HA"
+    - "DR"
+    - "Backup"
+  description: |
+    High availability database component pattern with multi-AZ deployment,
+    automated backups, and read replicas for scalability.
+
+architecture:
+  components:
+    - name: "primary_database"
+      type: "database"
+      tier: "database"
+      minimum_instances: 1
+      properties:
+        multi_az: true
+        encrypted: true
+        backup_retention: 30
+        auto_minor_version_upgrade: true
+
+    - name: "read_replicas"
+      type: "database"
+      tier: "database"
+      minimum_instances: 2
+      properties:
+        replica_type: "read"
+        multi_az: false
+
+  network_topology:
+    - source: "application"
+      target: "primary_database"
+      protocol: "tcp"
+      description: "Write operations"
+
+    - source: "application"
+      target: "read_replicas"
+      protocol: "tcp"
+      description: "Read operations"
+
+  constraints:
+    - description: "Production databases MUST be encrypted at rest"
+      type: "must"
+
+    - description: "Production databases MUST have automated backups enabled"
+      type: "must"
+
+    - description: "Backup retention MUST be at least 7 days for production"
+      type: "must"
+
+    - description: "Production databases MUST be deployed in multi-AZ configuration"
+      type: "must"
+
+implementation:
+  terraform_module: "git::https://github.com/example/patterns.git//ha-database?ref=v1.0"
+  required_variables:
+    - "database_name"
+    - "engine"
+    - "engine_version"
+    - "instance_class"
+    - "environment"
+  optional_variables:
+    - "backup_retention_period"
+    - "read_replica_count"
+    - "max_allocated_storage"
+  example_usage: |
+    module "ha_database" {
+      source = "git::https://github.com/example/patterns.git//ha-database?ref=v1.0"
+
+      database_name     = "myapp"
+      engine           = "postgres"
+      engine_version   = "14.7"
+      instance_class   = "db.r5.large"
+      environment      = "production"
+
+      backup_retention_period = 30
+      read_replica_count     = 2
+    }
+
+documentation:
+  diagram: "diagram.png"
+  adr: "https://wiki.example.com/adr/COMP-001"

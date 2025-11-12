@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - APP_ENV=development
+      - APP_DEBUG=true
+      - APP_PORT=5000
+      - DATABASE_URL=sqlite:///./architecture_validation.db
+      # ServiceNow credentials (set in .env file)
+      - SNOW_INSTANCE_URL=${SNOW_INSTANCE_URL:-}
+      - SNOW_API_USER=${SNOW_API_USER:-}
+      - SNOW_API_PASSWORD=${SNOW_API_PASSWORD:-}
+    volumes:
+      - ./patterns:/app/patterns
+      - ./data:/app/data
+      - ./src:/app/src
+      - ./static:/app/static
+    restart: unless-stopped
+
+volumes:
+  data:

@@ -1,0 +1,115 @@
+pattern:
+  id: "PAT-002"
+  name: "Microservices Architecture"
+  version: "1.0"
+  status: "approved"
+  owner: "Cloud Architecture Team"
+  approval_date: "2024-02-01"
+  compliance_tags:
+    - "Cloud-Native"
+    - "SOC2"
+  description: |
+    Microservices architecture pattern with container orchestration, service mesh,
+    and distributed data management. Suitable for complex applications requiring
+    independent deployment and scaling of services.
+
+architecture:
+  components:
+    - name: "api_gateway"
+      type: "load_balancer"
+      tier: "gateway"
+      minimum_instances: 2
+      properties:
+        type: "application"
+        scheme: "internet-facing"
+
+    - name: "service_instances"
+      type: "server"
+      tier: "app"
+      minimum_instances: 3
+      load_balanced: true
+      properties:
+        runtime: "container"
+        orchestration: "kubernetes"
+
+    - name: "service_database"
+      type: "database"
+      tier: "database"
+      properties:
+        pattern: "database-per-service"
+        engines:
+          - "postgresql"
+          - "mongodb"
+          - "redis"
+        encrypted: true
+        backup_retention: 14
+
+    - name: "message_queue"
+      type: "message_broker"
+      tier: "integration"
+      properties:
+        type: "rabbitmq"
+        ha_mode: true
+
+  network_topology:
+    - source: "api_gateway"
+      target: "service_instances"
+      protocol: "https"
+      port: 443
+
+    - source: "service_instances"
+      target: "service_database"
+      protocol: "tcp"
+
+    - source: "service_instances"
+      target: "message_queue"
+      protocol: "amqp"
+
+  constraints:
+    - description: "Each service MUST have its own database (database-per-service pattern)"
+      type: "must"
+
+    - description: "Services MUST communicate via API gateway for external traffic"
+      type: "must"
+
+    - description: "Services SHOULD use asynchronous messaging for inter-service communication"
+      type: "should"
+
+    - description: "All production services MUST be containerized"
+      type: "must"
+
+implementation:
+  terraform_module: "git::https://github.com/example/patterns.git//microservices?ref=v1.0"
+  required_variables:
+    - "application_name"
+    - "environment"
+    - "services"
+    - "cluster_name"
+    - "vpc_id"
+  optional_variables:
+    - "enable_service_mesh"
+    - "enable_api_gateway"
+    - "message_broker_type"
+  example_usage: |
+    module "microservices_app" {
+      source = "git::https://github.com/example/patterns.git//microservices?ref=v1.0"
+
+      application_name = "my-microservices-app"
+      environment      = "production"
+      cluster_name     = "prod-cluster"
+      vpc_id           = "vpc-12345678"
+
+      services = [
+        { name = "user-service", replicas = 3 },
+        { name = "order-service", replicas = 3 },
+        { name = "payment-service", replicas = 2 }
+      ]
+
+      enable_service_mesh = true
+      enable_api_gateway = true
+    }
+
+documentation:
+  diagram: "diagram.png"
+  adr: "https://wiki.example.com/adr/PAT-002"
+  runbook: "https://wiki.example.com/runbooks/microservices"

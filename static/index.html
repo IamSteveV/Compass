@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architecture Validation & Pattern Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">Architecture Validation</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" onclick="showSection('validate')">Validate</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSection('patterns')">Patterns</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/api/docs" target="_blank">API Docs</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Validation Section -->
+        <div id="validate-section">
+            <h2>Validate Infrastructure</h2>
+            <p class="text-muted">Upload a Terraform plan or query CMDB to validate against architectural standards</p>
+
+            <ul class="nav nav-tabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" data-bs-toggle="tab" href="#terraform-tab">Terraform Plan</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#cmdb-tab">CMDB Query</a>
+                </li>
+            </ul>
+
+            <div class="tab-content mt-3">
+                <!-- Terraform Tab -->
+                <div id="terraform-tab" class="tab-pane fade show active">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Upload Terraform Plan</h5>
+                            <p class="card-text">Upload a Terraform plan JSON file (generated with <code>terraform show -json tfplan.binary</code>)</p>
+                            <div class="mb-3">
+                                <input class="form-control" type="file" id="terraformFile" accept=".json">
+                            </div>
+                            <button class="btn btn-primary" onclick="validateTerraform()">Validate</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CMDB Tab -->
+                <div id="cmdb-tab" class="tab-pane fade">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Query CMDB Application</h5>
+                            <p class="card-text">Enter an application name or sys_id from ServiceNow CMDB</p>
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="cmdbAppId" placeholder="Application name or sys_id">
+                            </div>
+                            <button class="btn btn-primary" onclick="validateCMDB()">Validate</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div id="validation-results" class="mt-4" style="display: none;">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Validation Results</h5>
+                    </div>
+                    <div class="card-body" id="results-content">
+                        <!-- Results will be inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Patterns Section -->
+        <div id="patterns-section" style="display: none;">
+            <h2>Architecture Patterns</h2>
+            <p class="text-muted">Browse approved architecture patterns</p>
+
+            <div id="patterns-list" class="row">
+                <!-- Patterns will be loaded here -->
+            </div>
+
+            <!-- Pattern Detail Modal -->
+            <div class="modal fade" id="patternModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="patternModalTitle"></h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body" id="patternModalBody">
+                            <!-- Pattern details will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
