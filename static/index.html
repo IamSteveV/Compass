@@ -38,6 +38,9 @@
                         <a class="nav-link" href="#" onclick="showSection('notifications')">Notifications</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSection('settings')">Settings</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="/api/docs" target="_blank">API Docs</a>
                     </li>
                 </ul>
@@ -979,6 +982,387 @@
                         <li><strong>Circular Dependency Detection</strong> - Automatically identifies circular dependencies</li>
                         <li><strong>Export Options</strong> - Export as Mermaid or Graphviz DOT format</li>
                     </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Section -->
+        <div id="settings-section" style="display: none;">
+            <h2>Settings & Configuration</h2>
+            <p class="text-muted">Manage system settings, validation rules, and integrations</p>
+
+            <ul class="nav nav-pills mb-4" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" data-bs-toggle="pill" href="#settings-rules-tab">Validation Rules</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="pill" href="#settings-system-tab">System Settings</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="pill" href="#settings-integrations-tab">Integrations</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="pill" href="#settings-preferences-tab">Preferences</a>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <!-- Validation Rules Tab -->
+                <div id="settings-rules-tab" class="tab-pane fade show active">
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Validation Rules Management</h5>
+                            <button class="btn btn-sm btn-light" onclick="loadValidationRules()">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="rules-search"
+                                       placeholder="Search rules..." onkeyup="filterRules()">
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-hover" id="rules-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Rule ID</th>
+                                            <th>Name</th>
+                                            <th>Category</th>
+                                            <th>Severity</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Rules will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rule Details -->
+                    <div id="rule-details-card" class="card" style="display: none;">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0">Rule Details</h5>
+                        </div>
+                        <div class="card-body" id="rule-details-content">
+                            <!-- Rule details will be shown here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Settings Tab -->
+                <div id="settings-system-tab" class="tab-pane fade">
+                    <div class="row">
+                        <!-- Validation Settings -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0">Validation Settings</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Default Validation Mode</label>
+                                        <select class="form-select" id="default-validation-mode">
+                                            <option value="strict">Strict (All rules must pass)</option>
+                                            <option value="lenient">Lenient (Critical only)</option>
+                                            <option value="advisory">Advisory (Report only)</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Compliance Threshold (%)</label>
+                                        <input type="number" class="form-control" id="compliance-threshold"
+                                               min="0" max="100" value="80">
+                                        <small class="form-text text-muted">Minimum compliance score for approval</small>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Auto-approve Fast Track</label>
+                                        <select class="form-select" id="auto-approve-fast-track">
+                                            <option value="true">Yes</option>
+                                            <option value="false">No</option>
+                                        </select>
+                                        <small class="form-text text-muted">Automatically approve validations with 100% compliance</small>
+                                    </div>
+
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="require-pattern-match" checked>
+                                        <label class="form-check-label" for="require-pattern-match">
+                                            Require Pattern Match
+                                        </label>
+                                        <small class="form-text text-muted d-block">Infrastructure must match an approved pattern</small>
+                                    </div>
+
+                                    <button class="btn btn-primary" onclick="saveValidationSettings()">
+                                        <i class="bi bi-check-circle"></i> Save Settings
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Report Settings -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header bg-info text-white">
+                                    <h5 class="mb-0">Report Settings</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Report Format</label>
+                                        <select class="form-select" id="default-report-format">
+                                            <option value="pdf">PDF</option>
+                                            <option value="json">JSON</option>
+                                            <option value="html">HTML</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Report Detail Level</label>
+                                        <select class="form-select" id="report-detail-level">
+                                            <option value="summary">Summary Only</option>
+                                            <option value="standard">Standard</option>
+                                            <option value="detailed">Detailed</option>
+                                            <option value="verbose">Verbose</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="include-passed-rules" checked>
+                                        <label class="form-check-label" for="include-passed-rules">
+                                            Include Passed Rules in Report
+                                        </label>
+                                    </div>
+
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="include-topology-diagram" checked>
+                                        <label class="form-check-label" for="include-topology-diagram">
+                                            Include Topology Diagram
+                                        </label>
+                                    </div>
+
+                                    <button class="btn btn-primary" onclick="saveReportSettings()">
+                                        <i class="bi bi-check-circle"></i> Save Settings
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Storage Settings -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">Storage & Retention</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">History Retention (days)</label>
+                                    <input type="number" class="form-control" id="history-retention-days"
+                                           min="1" max="365" value="90">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Max Report Size (MB)</label>
+                                    <input type="number" class="form-control" id="max-report-size"
+                                           min="1" max="100" value="10">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Database Backup Frequency</label>
+                                    <select class="form-select" id="backup-frequency">
+                                        <option value="daily">Daily</option>
+                                        <option value="weekly">Weekly</option>
+                                        <option value="monthly">Monthly</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" onclick="saveStorageSettings()">
+                                <i class="bi bi-check-circle"></i> Save Settings
+                            </button>
+                            <button class="btn btn-danger ms-2" onclick="cleanupOldRecords()">
+                                <i class="bi bi-trash"></i> Cleanup Old Records
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Integrations Tab -->
+                <div id="settings-integrations-tab" class="tab-pane fade">
+                    <div class="row">
+                        <!-- CMDB Integration -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0">CMDB Integration</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">CMDB Type</label>
+                                        <select class="form-select" id="cmdb-type">
+                                            <option value="servicenow">ServiceNow</option>
+                                            <option value="device42">Device42</option>
+                                            <option value="custom">Custom API</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">CMDB API Endpoint</label>
+                                        <input type="url" class="form-control" id="cmdb-endpoint"
+                                               placeholder="https://cmdb.example.com/api">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">API Key</label>
+                                        <input type="password" class="form-control" id="cmdb-api-key">
+                                    </div>
+
+                                    <button class="btn btn-info" onclick="testCMDBConnection()">
+                                        <i class="bi bi-plug"></i> Test Connection
+                                    </button>
+                                    <button class="btn btn-primary ms-2" onclick="saveCMDBSettings()">
+                                        <i class="bi bi-check-circle"></i> Save
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Git Integration -->
+                        <div class="col-md-6 mb-4">
+                            <div class="card">
+                                <div class="card-header bg-secondary text-white">
+                                    <h5 class="mb-0">Git Integration</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Repository URL</label>
+                                        <input type="url" class="form-control" id="git-repo-url"
+                                               placeholder="https://github.com/org/repo.git">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Branch</label>
+                                        <input type="text" class="form-control" id="git-branch" value="main">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Access Token</label>
+                                        <input type="password" class="form-control" id="git-token">
+                                    </div>
+
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="git-auto-sync">
+                                        <label class="form-check-label" for="git-auto-sync">
+                                            Auto-sync patterns from repository
+                                        </label>
+                                    </div>
+
+                                    <button class="btn btn-primary" onclick="saveGitSettings()">
+                                        <i class="bi bi-check-circle"></i> Save Settings
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preferences Tab -->
+                <div id="settings-preferences-tab" class="tab-pane fade">
+                    <div class="card">
+                        <div class="card-header bg-dark text-white">
+                            <h5 class="mb-0">User Preferences</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Theme</label>
+                                    <select class="form-select" id="ui-theme">
+                                        <option value="light">Light</option>
+                                        <option value="dark">Dark</option>
+                                        <option value="auto">Auto (System)</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Items Per Page</label>
+                                    <select class="form-select" id="items-per-page">
+                                        <option value="10">10</option>
+                                        <option value="25">25</option>
+                                        <option value="50" selected>50</option>
+                                        <option value="100">100</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Date Format</label>
+                                    <select class="form-select" id="date-format">
+                                        <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                                        <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                                        <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Time Zone</label>
+                                    <select class="form-select" id="timezone">
+                                        <option value="UTC">UTC</option>
+                                        <option value="America/New_York">Eastern Time</option>
+                                        <option value="America/Chicago">Central Time</option>
+                                        <option value="America/Denver">Mountain Time</option>
+                                        <option value="America/Los_Angeles">Pacific Time</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="show-tooltips" checked>
+                                        <label class="form-check-label" for="show-tooltips">
+                                            Show Tooltips
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="enable-animations" checked>
+                                        <label class="form-check-label" for="enable-animations">
+                                            Enable Animations
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="auto-refresh">
+                                        <label class="form-check-label" for="auto-refresh">
+                                            Auto-refresh Data (30 seconds)
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button class="btn btn-primary" onclick="saveUserPreferences()">
+                                <i class="bi bi-check-circle"></i> Save Preferences
+                            </button>
+                            <button class="btn btn-secondary ms-2" onclick="resetPreferences()">
+                                <i class="bi bi-arrow-counterclockwise"></i> Reset to Defaults
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Export/Import Configuration -->
+                    <div class="card mt-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">Configuration Backup</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Export or import system configuration including patterns, rules, and settings.</p>
+                            <div class="btn-group">
+                                <button class="btn btn-primary" onclick="exportConfiguration()">
+                                    <i class="bi bi-download"></i> Export Configuration
+                                </button>
+                                <button class="btn btn-success" onclick="document.getElementById('import-config-file').click()">
+                                    <i class="bi bi-upload"></i> Import Configuration
+                                </button>
+                            </div>
+                            <input type="file" id="import-config-file" accept=".json" style="display: none;"
+                                   onchange="importConfiguration(this.files[0])">
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

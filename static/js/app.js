@@ -91,9 +91,10 @@ function showSection(section) {
     const terraformCloudSection = document.getElementById('terraform-cloud-section');
     const analyticsSection = document.getElementById('analytics-section');
     const resourceGraphSection = document.getElementById('resource-graph-section');
+    const settingsSection = document.getElementById('settings-section');
 
     // Fade out current section
-    [validateSection, patternsSection, notificationsSection, terraformCloudSection, analyticsSection, resourceGraphSection].forEach(s => {
+    [validateSection, patternsSection, notificationsSection, terraformCloudSection, analyticsSection, resourceGraphSection, settingsSection].forEach(s => {
         if (s && s.style.display !== 'none') {
             s.style.opacity = '0';
             setTimeout(() => {
@@ -125,6 +126,11 @@ function showSection(section) {
             resourceGraphSection.style.display = 'block';
             setTimeout(() => { resourceGraphSection.style.opacity = '1'; }, 10);
             populateHistoryValidationSelect();
+        } else if (section === 'settings') {
+            settingsSection.style.display = 'block';
+            setTimeout(() => { settingsSection.style.opacity = '1'; }, 10);
+            loadValidationRules();
+            loadSystemSettings();
         }
     }, 300);
 }
@@ -3207,7 +3213,533 @@ function copyMermaidCode() {
     });
 }
 
+// ==========================================
+// Settings & Configuration Functions
+// ==========================================
+
+// Global state for settings
+let systemSettings = {
+    validation: {},
+    report: {},
+    storage: {},
+    integrations: {},
+    preferences: {}
+};
+
+// Load validation rules
+async function loadValidationRules() {
+    try {
+        showLoading('Loading validation rules...');
+
+        const response = await fetch(`${API_BASE}/rules/`);
+        if (!response.ok) {
+            throw new Error('Failed to load rules');
+        }
+
+        const rules = await response.json();
+
+        const tbody = document.querySelector('#rules-table tbody');
+        tbody.innerHTML = '';
+
+        rules.forEach(rule => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><code>${rule.id}</code></td>
+                <td>${rule.name || 'N/A'}</td>
+                <td><span class="badge bg-secondary">${rule.category || 'N/A'}</span></td>
+                <td><span class="badge bg-${rule.severity === 'critical' ? 'danger' : rule.severity === 'high' ? 'warning' : 'info'}">${rule.severity || 'N/A'}</span></td>
+                <td>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" ${rule.enabled !== false ? 'checked' : ''}
+                               onchange="toggleRule('${rule.id}', this.checked)">
+                    </div>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="viewRuleDetails('${rule.id}')">
+                        <i class="bi bi-eye"></i> View
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        Toast.success('Rules loaded');
+
+    } catch (error) {
+        Toast.error(`Failed to load rules: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Filter rules
+function filterRules() {
+    const searchTerm = document.getElementById('rules-search').value.toLowerCase();
+    const rows = document.querySelectorAll('#rules-table tbody tr');
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(searchTerm) ? '' : 'none';
+    });
+}
+
+// Toggle rule enabled/disabled
+async function toggleRule(ruleId, enabled) {
+    try {
+        const response = await fetch(`${API_BASE}/rules/${ruleId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to toggle rule');
+        }
+
+        Toast.success(`Rule ${enabled ? 'enabled' : 'disabled'}`);
+
+    } catch (error) {
+        Toast.error(`Failed to toggle rule: ${error.message}`);
+        // Revert checkbox
+        loadValidationRules();
+    }
+}
+
+// View rule details
+async function viewRuleDetails(ruleId) {
+    try {
+        showLoading('Loading rule details...');
+
+        const response = await fetch(`${API_BASE}/rules/${ruleId}`);
+        if (!response.ok) {
+            throw new Error('Failed to load rule details');
+        }
+
+        const rule = await response.json();
+
+        const detailsDiv = document.getElementById('rule-details-content');
+        detailsDiv.innerHTML = `
+            <h6>${rule.name || rule.id}</h6>
+            <div class="mb-3">
+                <strong>ID:</strong> <code>${rule.id}</code><br>
+                <strong>Category:</strong> <span class="badge bg-secondary">${rule.category || 'N/A'}</span><br>
+                <strong>Severity:</strong> <span class="badge bg-${rule.severity === 'critical' ? 'danger' : rule.severity === 'high' ? 'warning' : 'info'}">${rule.severity || 'N/A'}</span><br>
+                <strong>Status:</strong> ${rule.enabled !== false ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>'}
+            </div>
+            <div class="mb-3">
+                <strong>Description:</strong>
+                <p>${rule.description || 'No description available'}</p>
+            </div>
+            ${rule.configuration ? `
+                <div class="mb-3">
+                    <strong>Configuration:</strong>
+                    <pre class="bg-light p-2">${JSON.stringify(rule.configuration, null, 2)}</pre>
+                </div>
+            ` : ''}
+        `;
+
+        document.getElementById('rule-details-card').style.display = 'block';
+
+    } catch (error) {
+        Toast.error(`Failed to load rule details: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Load system settings
+async function loadSystemSettings() {
+    try {
+        const response = await fetch(`${API_BASE}/settings/`);
+        if (response.ok) {
+            systemSettings = await response.json();
+            populateSettingsForm();
+        }
+    } catch (error) {
+        console.error('Failed to load system settings:', error);
+    }
+}
+
+// Populate settings form
+function populateSettingsForm() {
+    if (systemSettings.validation) {
+        if (systemSettings.validation.mode) {
+            document.getElementById('default-validation-mode').value = systemSettings.validation.mode;
+        }
+        if (systemSettings.validation.complianceThreshold) {
+            document.getElementById('compliance-threshold').value = systemSettings.validation.complianceThreshold;
+        }
+    }
+
+    if (systemSettings.report) {
+        if (systemSettings.report.format) {
+            document.getElementById('default-report-format').value = systemSettings.report.format;
+        }
+        if (systemSettings.report.detailLevel) {
+            document.getElementById('report-detail-level').value = systemSettings.report.detailLevel;
+        }
+    }
+}
+
+// Save validation settings
+async function saveValidationSettings() {
+    try {
+        const settings = {
+            mode: document.getElementById('default-validation-mode').value,
+            complianceThreshold: parseInt(document.getElementById('compliance-threshold').value),
+            autoApproveFastTrack: document.getElementById('auto-approve-fast-track').value === 'true',
+            requirePatternMatch: document.getElementById('require-pattern-match').checked
+        };
+
+        Toast.info('Saving validation settings...');
+
+        const response = await fetch(`${API_BASE}/settings/validation`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to save settings');
+        }
+
+        systemSettings.validation = settings;
+        Toast.success('Validation settings saved!');
+
+    } catch (error) {
+        Toast.error(`Failed to save settings: ${error.message}`);
+    }
+}
+
+// Save report settings
+async function saveReportSettings() {
+    try {
+        const settings = {
+            format: document.getElementById('default-report-format').value,
+            detailLevel: document.getElementById('report-detail-level').value,
+            includePassedRules: document.getElementById('include-passed-rules').checked,
+            includeTopologyDiagram: document.getElementById('include-topology-diagram').checked
+        };
+
+        Toast.info('Saving report settings...');
+
+        const response = await fetch(`${API_BASE}/settings/report`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to save settings');
+        }
+
+        systemSettings.report = settings;
+        Toast.success('Report settings saved!');
+
+    } catch (error) {
+        Toast.error(`Failed to save settings: ${error.message}`);
+    }
+}
+
+// Save storage settings
+async function saveStorageSettings() {
+    try {
+        const settings = {
+            retentionDays: parseInt(document.getElementById('history-retention-days').value),
+            maxReportSize: parseInt(document.getElementById('max-report-size').value),
+            backupFrequency: document.getElementById('backup-frequency').value
+        };
+
+        Toast.info('Saving storage settings...');
+
+        const response = await fetch(`${API_BASE}/settings/storage`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to save settings');
+        }
+
+        systemSettings.storage = settings;
+        Toast.success('Storage settings saved!');
+
+    } catch (error) {
+        Toast.error(`Failed to save settings: ${error.message}`);
+    }
+}
+
+// Cleanup old records
+async function cleanupOldRecords() {
+    if (!confirm('This will delete validation history older than the retention period. Continue?')) {
+        return;
+    }
+
+    try {
+        Toast.info('Cleaning up old records...');
+        showLoading('Deleting old records...');
+
+        const response = await fetch(`${API_BASE}/maintenance/cleanup`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            throw new Error('Cleanup failed');
+        }
+
+        const result = await response.json();
+        Toast.success(`Cleanup complete! Deleted ${result.deletedCount || 0} records.`);
+
+    } catch (error) {
+        Toast.error(`Cleanup failed: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Test CMDB connection
+async function testCMDBConnection() {
+    try {
+        const config = {
+            type: document.getElementById('cmdb-type').value,
+            endpoint: document.getElementById('cmdb-endpoint').value,
+            apiKey: document.getElementById('cmdb-api-key').value
+        };
+
+        if (!config.endpoint || !config.apiKey) {
+            Toast.warning('Please provide endpoint and API key');
+            return;
+        }
+
+        Toast.info('Testing CMDB connection...');
+        showLoading('Connecting to CMDB...');
+
+        const response = await fetch(`${API_BASE}/integrations/cmdb/test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        if (!response.ok) {
+            throw new Error('Connection test failed');
+        }
+
+        const result = await response.json();
+        Toast.success(`Connection successful! Found ${result.recordCount || 0} records.`);
+
+    } catch (error) {
+        Toast.error(`Connection failed: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Save CMDB settings
+async function saveCMDBSettings() {
+    try {
+        const config = {
+            type: document.getElementById('cmdb-type').value,
+            endpoint: document.getElementById('cmdb-endpoint').value,
+            apiKey: document.getElementById('cmdb-api-key').value
+        };
+
+        Toast.info('Saving CMDB settings...');
+
+        const response = await fetch(`${API_BASE}/integrations/cmdb`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to save settings');
+        }
+
+        systemSettings.integrations.cmdb = config;
+        Toast.success('CMDB settings saved!');
+
+    } catch (error) {
+        Toast.error(`Failed to save settings: ${error.message}`);
+    }
+}
+
+// Save Git settings
+async function saveGitSettings() {
+    try {
+        const config = {
+            repoUrl: document.getElementById('git-repo-url').value,
+            branch: document.getElementById('git-branch').value,
+            token: document.getElementById('git-token').value,
+            autoSync: document.getElementById('git-auto-sync').checked
+        };
+
+        Toast.info('Saving Git settings...');
+
+        const response = await fetch(`${API_BASE}/integrations/git`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to save settings');
+        }
+
+        systemSettings.integrations.git = config;
+        Toast.success('Git settings saved!');
+
+    } catch (error) {
+        Toast.error(`Failed to save settings: ${error.message}`);
+    }
+}
+
+// Save user preferences
+async function saveUserPreferences() {
+    try {
+        const preferences = {
+            theme: document.getElementById('ui-theme').value,
+            itemsPerPage: parseInt(document.getElementById('items-per-page').value),
+            dateFormat: document.getElementById('date-format').value,
+            timezone: document.getElementById('timezone').value,
+            showTooltips: document.getElementById('show-tooltips').checked,
+            enableAnimations: document.getElementById('enable-animations').checked,
+            autoRefresh: document.getElementById('auto-refresh').checked
+        };
+
+        // Save to localStorage
+        localStorage.setItem('userPreferences', JSON.stringify(preferences));
+
+        systemSettings.preferences = preferences;
+        Toast.success('Preferences saved!');
+
+        // Apply theme if changed
+        applyTheme(preferences.theme);
+
+    } catch (error) {
+        Toast.error(`Failed to save preferences: ${error.message}`);
+    }
+}
+
+// Reset preferences to defaults
+function resetPreferences() {
+    if (!confirm('Reset all preferences to defaults?')) {
+        return;
+    }
+
+    localStorage.removeItem('userPreferences');
+
+    document.getElementById('ui-theme').value = 'light';
+    document.getElementById('items-per-page').value = '50';
+    document.getElementById('date-format').value = 'MM/DD/YYYY';
+    document.getElementById('timezone').value = 'UTC';
+    document.getElementById('show-tooltips').checked = true;
+    document.getElementById('enable-animations').checked = true;
+    document.getElementById('auto-refresh').checked = false;
+
+    Toast.success('Preferences reset to defaults');
+}
+
+// Apply theme
+function applyTheme(theme) {
+    // Theme application would be implemented based on CSS classes
+    if (theme === 'dark') {
+        document.body.classList.add('dark-theme');
+    } else {
+        document.body.classList.remove('dark-theme');
+    }
+}
+
+// Export configuration
+async function exportConfiguration() {
+    try {
+        Toast.info('Exporting configuration...');
+        showLoading('Generating export...');
+
+        const response = await fetch(`${API_BASE}/export/configuration`);
+        if (!response.ok) {
+            throw new Error('Export failed');
+        }
+
+        const config = await response.json();
+
+        const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `architecture-validation-config-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        Toast.success('Configuration exported!');
+
+    } catch (error) {
+        Toast.error(`Export failed: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Import configuration
+async function importConfiguration(file) {
+    if (!file) return;
+
+    if (!confirm('Importing will overwrite existing configuration. Continue?')) {
+        return;
+    }
+
+    try {
+        Toast.info('Importing configuration...');
+        showLoading('Importing...');
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const config = JSON.parse(e.target.result);
+
+                const response = await fetch(`${API_BASE}/import/configuration`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+
+                if (!response.ok) {
+                    throw new Error('Import failed');
+                }
+
+                Toast.success('Configuration imported! Reloading...');
+                setTimeout(() => window.location.reload(), 2000);
+
+            } catch (error) {
+                Toast.error(`Import failed: ${error.message}`);
+            } finally {
+                hideLoading();
+            }
+        };
+
+        reader.readAsText(file);
+
+    } catch (error) {
+        Toast.error(`Import failed: ${error.message}`);
+        hideLoading();
+    }
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Architecture Validation System loaded');
+
+    // Load user preferences from localStorage
+    const savedPreferences = localStorage.getItem('userPreferences');
+    if (savedPreferences) {
+        try {
+            const preferences = JSON.parse(savedPreferences);
+            systemSettings.preferences = preferences;
+            applyTheme(preferences.theme);
+        } catch (error) {
+            console.error('Failed to load preferences:', error);
+        }
+    }
 });
