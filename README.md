@@ -35,58 +35,39 @@ For a comprehensive understanding of the system architecture:
 
 ## Quick Start
 
-### Prerequisites
-
-- Python 3.10+
-- (Optional) Docker and Docker Compose
-- (Optional) ServiceNow instance with CMDB access
-
-### Installation
+### 5-Minute Setup
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd Compass
+# Clone and setup
+git clone <repository-url> && cd Compass
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt && cp .env.example .env
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your ServiceNow credentials
+# Initialize and start
+python -c "from src.database.session import init_db; init_db()"
+uvicorn src.api.main:app --reload --port 5000
 ```
 
-### Running the Application
+**Access the application:**
+- Web UI: http://localhost:5000/static/index.html
+- Dashboard: http://localhost:5000/static/dashboard.html
+- API Docs: http://localhost:5000/api/docs
 
-#### Option 1: Using Python Directly
+### Full Installation Guide
 
-```bash
-# Start web server
-python app.py
+For detailed installation instructions including:
+- **System prerequisites and verification**
+- **Local development setup (step-by-step)**
+- **Docker installation and configuration**
+- **Production deployment** (systemd, Nginx, Kubernetes)
+- **Troubleshooting common issues**
+- **Configuration options**
 
-# Or use CLI
-python validate.py --help
-```
+See **[Installation Guide](docs/INSTALLATION.md)**
 
-#### Option 2: Using Docker
+### Quick Reference
 
-```bash
-# Build and run
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop
-docker-compose down
-```
-
-The web UI will be available at: http://localhost:5000
-API documentation at: http://localhost:5000/api/docs
+For quick access to common commands and operations, see **[Quick Reference Card](docs/QUICK_REFERENCE.md)**
 
 ## Usage
 
