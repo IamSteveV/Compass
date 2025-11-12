@@ -45,6 +45,7 @@ python-dotenv==1.0.0
 # Utilities
 python-dateutil==2.8.2
 jsonschema==4.20.0
+psutil==5.9.6
 
 # Reporting (optional)
 reportlab==4.0.7

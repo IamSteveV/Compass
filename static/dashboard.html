@@ -35,8 +35,15 @@
     </nav>
 
     <div class="container mt-4">
-        <h2>Compliance Dashboard</h2>
+        <h1>Compliance Dashboard</h1>
         <p class="text-muted">Analytics and metrics for architecture validation</p>
+
+        <!-- System Status Indicator -->
+        <div class="alert alert-info d-flex align-items-center" role="alert" id="systemStatus" style="display: none !important;">
+            <span class="spinner-border spinner-border-sm me-2" role="status" id="statusSpinner"></span>
+            <div class="flex-grow-1" id="statusMessage">Checking system status...</div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
 
         <!-- Summary Cards -->
         <div class="row mb-4" id="summary-cards">
