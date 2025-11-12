@@ -32,6 +32,12 @@ terraform:
     - "1.5"
     - "1.6"
 
+terraform_cloud:
+  enabled: false
+  api_token: "${TERRAFORM_CLOUD_TOKEN}"
+  organization: "${TERRAFORM_CLOUD_ORG}"
+  base_url: "${TERRAFORM_CLOUD_URL:https://app.terraform.io/api/v2}"
+
 approval:
   routing:
     fast_track_threshold: 0.95
