@@ -15,16 +15,38 @@ from src.validation.rule import get_rule_registry
 from src.patterns.matcher import PatternMatcher
 from src.patterns.library import PatternLibrary
 
+# Import all validation rules at module level
+from src.validation.rules.security_rules import (
+    NoDirectWebToDatabaseRule,
+    ProductionDatabaseEncryptionRule,
+    DMZIsolationRule,
+    ProductionBackupRule
+)
+from src.validation.rules.metadata_rules import (
+    RequiredMetadataRule,
+    ProductionDRTierRule
+)
+from src.validation.rules.technology_rules import (
+    ApprovedDatabaseVersionRule,
+    ApprovedInstanceTypeRule
+)
+from src.validation.rules.resilience_rules import (
+    ProductionMultiAZRule,
+    DatabaseBackupEnabledRule
+)
+from src.validation.rules.network_rules import (
+    PublicSubnetIsolationRule,
+    LoadBalancerSSLRule,
+    VPCFlowLogsRule
+)
+from src.validation.rules.cost_rules import (
+    UnusedResourceRule,
+    OversizedInstanceRule
+)
+
 
 def register_test_rules():
     """Register all validation rules for testing"""
-    from src.validation.rules.security_rules import *
-    from src.validation.rules.metadata_rules import *
-    from src.validation.rules.technology_rules import *
-    from src.validation.rules.resilience_rules import *
-    from src.validation.rules.network_rules import *
-    from src.validation.rules.cost_rules import *
-
     registry = get_rule_registry()
     registry.clear()
 
