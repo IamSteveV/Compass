@@ -11,7 +11,8 @@ from typing import List, Optional
 import logging
 
 from ..config import get_settings
-from .routers import patterns, validation, cmdb
+from .routers import patterns, validation, cmdb, analytics, history
+from ..database.session import init_db
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,10 +25,22 @@ settings = get_settings()
 app = FastAPI(
     title="Architecture Validation & Pattern Management System",
     description="POC system for validating infrastructure against architectural standards",
-    version="0.1.0",
+    version="0.2.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc"
 )
+
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database and other startup tasks"""
+    logger.info("Initializing database...")
+    try:
+        init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        # Continue anyway for POC - database is optional
 
 # Configure CORS
 app.add_middleware(
@@ -42,6 +55,8 @@ app.add_middleware(
 app.include_router(patterns.router, prefix="/api/patterns", tags=["patterns"])
 app.include_router(validation.router, prefix="/api/validate", tags=["validation"])
 app.include_router(cmdb.router, prefix="/api/cmdb", tags=["cmdb"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(history.router, prefix="/api/history", tags=["history"])
 
 # Serve static files for frontend
 static_path = Path(__file__).parent.parent.parent / "static"
@@ -74,11 +89,13 @@ async def api_info():
     """API information"""
     return {
         "name": "Architecture Validation API",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "endpoints": {
             "patterns": "/api/patterns",
             "validation": "/api/validate",
-            "cmdb": "/api/cmdb"
+            "cmdb": "/api/cmdb",
+            "analytics": "/api/analytics",
+            "history": "/api/history"
         }
     }
 

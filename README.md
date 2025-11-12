@@ -4,15 +4,27 @@ A proof-of-concept system for validating infrastructure against architectural st
 
 ## Features
 
-- **Validation Engine**: Validate infrastructure against 10+ architectural rules covering security, compliance, resilience, and technology standards
+### Core Validation
+- **Validation Engine**: Validate infrastructure against 15+ architectural rules covering security, compliance, resilience, network, and cost optimization
 - **Pattern Library**: Pre-approved architecture patterns (3-tier web, microservices, HA database)
 - **Pattern Matching**: Automatically identify matching patterns with similarity scores
 - **Approval Routing**: Fast-track (≥95%), Standard (85-94%), or Full Review (<85%) based on pattern match
 - **Multi-Source Support**: Validate Terraform plans or ServiceNow CMDB applications
-- **Web UI**: Simple web interface for validation and pattern browsing
+
+### User Interfaces
+- **Web UI**: Modern web interface for validation, pattern browsing, and analytics dashboard
 - **REST API**: FastAPI-based REST API with OpenAPI documentation
 - **CLI Tool**: Command-line interface for automation and CI/CD integration
-- **Diagram Generation**: Auto-generate architecture diagrams from infrastructure data
+- **Analytics Dashboard**: Real-time metrics, compliance trends, and violation tracking
+
+### Advanced Features (v0.2.0)
+- **Database Persistence**: SQLAlchemy-based history tracking and analytics
+- **Validation History**: Track all validations with full audit trail
+- **Pattern Usage Analytics**: Monitor pattern adoption and popular patterns
+- **Violation Tracking**: Detailed tracking of rule violations by severity
+- **Compliance Metrics**: Real-time compliance scores and trends
+- **Test Data Generators**: Generate sample data for testing and demos
+- **Diagram Generation**: Auto-generate architecture diagrams with Graphviz
 
 ## Quick Start
 
@@ -180,6 +192,17 @@ Full API documentation: http://localhost:5000/api/docs
 ### Resilience Rules (2)
 - **RES-001**: Production multi-AZ requirement (High)
 - **RES-002**: Database automated backup requirement (High)
+
+### Network Rules (3) - New in v0.2.0
+- **NET-001**: Database tier public subnet isolation (Critical)
+- **NET-002**: Load balancer SSL/TLS requirement (High)
+- **NET-003**: VPC flow logs requirement (Medium)
+
+### Cost Optimization Rules (2) - New in v0.2.0
+- **COST-001**: Unused resource detection (Low)
+- **COST-002**: Oversized instance detection (Low)
+
+**Total: 15 validation rules**
 
 ## Architecture Patterns
 

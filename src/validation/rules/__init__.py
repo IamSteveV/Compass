@@ -4,6 +4,8 @@ from .security_rules import *
 from .metadata_rules import *
 from .technology_rules import *
 from .resilience_rules import *
+from .network_rules import *
+from .cost_rules import *
 
 __all__ = [
     # Security Rules
@@ -23,4 +25,13 @@ __all__ = [
     # Resilience Rules
     "ProductionMultiAZRule",
     "DatabaseBackupEnabledRule",
+
+    # Network Rules
+    "PublicSubnetIsolationRule",
+    "LoadBalancerSSLRule",
+    "VPCFlowLogsRule",
+
+    # Cost Rules
+    "UnusedResourceRule",
+    "OversizedInstanceRule",
 ]
