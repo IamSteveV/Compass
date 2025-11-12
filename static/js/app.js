@@ -90,9 +90,10 @@ function showSection(section) {
     const notificationsSection = document.getElementById('notifications-section');
     const terraformCloudSection = document.getElementById('terraform-cloud-section');
     const analyticsSection = document.getElementById('analytics-section');
+    const resourceGraphSection = document.getElementById('resource-graph-section');
 
     // Fade out current section
-    [validateSection, patternsSection, notificationsSection, terraformCloudSection, analyticsSection].forEach(s => {
+    [validateSection, patternsSection, notificationsSection, terraformCloudSection, analyticsSection, resourceGraphSection].forEach(s => {
         if (s && s.style.display !== 'none') {
             s.style.opacity = '0';
             setTimeout(() => {
@@ -120,6 +121,10 @@ function showSection(section) {
         } else if (section === 'analytics') {
             analyticsSection.style.display = 'block';
             setTimeout(() => { analyticsSection.style.opacity = '1'; }, 10);
+        } else if (section === 'resource-graph') {
+            resourceGraphSection.style.display = 'block';
+            setTimeout(() => { resourceGraphSection.style.opacity = '1'; }, 10);
+            populateHistoryValidationSelect();
         }
     }, 300);
 }
@@ -2129,6 +2134,564 @@ function displayComparisonResults(data) {
 
     container.innerHTML = html;
     container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ==========================================
+// Resource Graph Visualizer Functions
+// ==========================================
+
+// Global state for resource graph
+let resourceGraphData = {
+    network: null,
+    nodes: null,
+    edges: null,
+    rawData: null,
+    physicsEnabled: true
+};
+
+// Resource type to color mapping
+const RESOURCE_TYPE_COLORS = {
+    'compute': '#97C2FC',
+    'database': '#FB7E81',
+    'network': '#7BE141',
+    'storage': '#FFA807',
+    'security': '#C2FABC',
+    'load_balancer': '#FFCA81',
+    'default': '#CCCCCC'
+};
+
+// Populate validation history select for graph source
+async function populateHistoryValidationSelect() {
+    try {
+        const response = await fetch(`${API_BASE}/history?limit=20`);
+        if (!response.ok) {
+            return;
+        }
+
+        const data = await response.json();
+        const select = document.getElementById('history-validation-select');
+
+        let options = '<option value="">Select a validation...</option>';
+        (data.validations || []).forEach(val => {
+            const timestamp = new Date(val.timestamp).toLocaleString();
+            options += `<option value="${val.validation_id}">${timestamp} - ${val.source_identifier || val.source_type}</option>`;
+        });
+
+        select.innerHTML = options;
+
+    } catch (error) {
+        console.error('Failed to load validation history:', error);
+    }
+}
+
+// Generate resource graph
+async function generateResourceGraph() {
+    try {
+        Toast.info('Generating resource graph...');
+        showLoading('Building dependency graph...');
+
+        let graphData;
+        const source = document.querySelector('input[name="graph-source"]:checked').id;
+
+        if (source === 'graph-from-current') {
+            // Use current validation report
+            if (!window.currentReport) {
+                throw new Error('No current validation available. Please run a validation first.');
+            }
+            graphData = {
+                resources: window.currentReport.resources || [],
+                topology: window.currentReport.topology || []
+            };
+
+        } else if (source === 'graph-from-history') {
+            // Load from historical validation
+            const validationId = document.getElementById('history-validation-select').value;
+            if (!validationId) {
+                throw new Error('Please select a validation from history');
+            }
+
+            const response = await fetch(`${API_BASE}/graph/${validationId}`);
+            if (!response.ok) {
+                throw new Error('Failed to load graph data');
+            }
+
+            graphData = await response.json();
+
+        } else if (source === 'graph-from-custom') {
+            // Parse custom JSON data
+            const customData = document.getElementById('custom-graph-data').value;
+            if (!customData.trim()) {
+                throw new Error('Please provide custom graph data in JSON format');
+            }
+
+            try {
+                graphData = JSON.parse(customData);
+            } catch (e) {
+                throw new Error('Invalid JSON format: ' + e.message);
+            }
+        }
+
+        // Store raw data
+        resourceGraphData.rawData = graphData;
+
+        // Generate graph using API
+        const response = await fetch(`${API_BASE}/graph/generate`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(graphData)
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to generate graph');
+        }
+
+        const result = await response.json();
+
+        // Display interactive graph
+        displayInteractiveGraph(result);
+
+        Toast.success('Graph generated successfully!');
+
+    } catch (error) {
+        Toast.error(`Graph generation failed: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Display interactive graph using vis-network
+function displayInteractiveGraph(graphData) {
+    const container = document.getElementById('resource-graph-canvas');
+    const vizContainer = document.getElementById('graph-visualization-container');
+
+    vizContainer.style.display = 'block';
+
+    // Prepare nodes
+    const nodes = (graphData.nodes || []).map(node => {
+        const category = categorizeResource(node.type);
+        return {
+            id: node.id,
+            label: node.label || node.id,
+            title: `${node.type}\n${node.id}`,
+            color: RESOURCE_TYPE_COLORS[category] || RESOURCE_TYPE_COLORS['default'],
+            shape: 'box',
+            font: { size: 14 },
+            data: node
+        };
+    });
+
+    // Prepare edges
+    const edges = (graphData.edges || []).map((edge, idx) => ({
+        id: idx,
+        from: edge.from,
+        to: edge.to,
+        label: edge.type || 'depends_on',
+        arrows: 'to',
+        smooth: { type: 'cubicBezier' }
+    }));
+
+    // Create vis-network dataset
+    resourceGraphData.nodes = new vis.DataSet(nodes);
+    resourceGraphData.edges = new vis.DataSet(edges);
+
+    // Network options
+    const options = {
+        nodes: {
+            borderWidth: 2,
+            borderWidthSelected: 4,
+            shadow: true
+        },
+        edges: {
+            width: 2,
+            shadow: true,
+            color: {
+                color: '#848484',
+                highlight: '#2B7CE9',
+                hover: '#2B7CE9'
+            }
+        },
+        physics: {
+            enabled: true,
+            barnesHut: {
+                gravitationalConstant: -30000,
+                centralGravity: 0.3,
+                springLength: 200,
+                springConstant: 0.04,
+                damping: 0.09,
+                avoidOverlap: 0.5
+            },
+            stabilization: {
+                iterations: 200
+            }
+        },
+        interaction: {
+            hover: true,
+            navigationButtons: true,
+            keyboard: true
+        }
+    };
+
+    // Destroy existing network
+    if (resourceGraphData.network) {
+        resourceGraphData.network.destroy();
+    }
+
+    // Create new network
+    resourceGraphData.network = new vis.Network(container, {
+        nodes: resourceGraphData.nodes,
+        edges: resourceGraphData.edges
+    }, options);
+
+    // Event handlers
+    resourceGraphData.network.on('click', function(params) {
+        if (params.nodes.length > 0) {
+            const nodeId = params.nodes[0];
+            showNodeDetails(nodeId);
+        }
+    });
+
+    resourceGraphData.network.on('stabilizationIterationsDone', function() {
+        resourceGraphData.network.setOptions({ physics: false });
+        resourceGraphData.physicsEnabled = false;
+    });
+
+    // Update statistics
+    updateGraphStatistics(graphData);
+
+    // Populate type filter
+    populateTypeFilter(nodes);
+
+    // Scroll to graph
+    vizContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Categorize resource by type
+function categorizeResource(resourceType) {
+    const type = resourceType.toLowerCase();
+
+    if (type.includes('instance') || type.includes('vm') || type.includes('container')) {
+        return 'compute';
+    } else if (type.includes('db') || type.includes('database') || type.includes('rds')) {
+        return 'database';
+    } else if (type.includes('vpc') || type.includes('subnet') || type.includes('route') || type.includes('gateway')) {
+        return 'network';
+    } else if (type.includes('bucket') || type.includes('storage') || type.includes('volume')) {
+        return 'storage';
+    } else if (type.includes('sg') || type.includes('security_group') || type.includes('acl')) {
+        return 'security';
+    } else if (type.includes('lb') || type.includes('load_balancer') || type.includes('alb') || type.includes('elb')) {
+        return 'load_balancer';
+    }
+
+    return 'default';
+}
+
+// Update graph statistics
+function updateGraphStatistics(graphData) {
+    document.getElementById('graph-total-nodes').textContent = graphData.nodes?.length || 0;
+    document.getElementById('graph-total-edges').textContent = graphData.edges?.length || 0;
+
+    const uniqueTypes = new Set((graphData.nodes || []).map(n => categorizeResource(n.type)));
+    document.getElementById('graph-resource-types').textContent = uniqueTypes.size;
+
+    document.getElementById('graph-circular-deps').textContent = graphData.circular_dependencies || 0;
+}
+
+// Populate type filter dropdown
+function populateTypeFilter(nodes) {
+    const types = new Set();
+    nodes.forEach(node => {
+        const category = categorizeResource(node.data.type);
+        types.add(category);
+    });
+
+    const select = document.getElementById('graph-filter-type');
+    let options = '<option value="">All Resource Types</option>';
+
+    Array.from(types).sort().forEach(type => {
+        const displayName = type.charAt(0).toUpperCase() + type.slice(1);
+        options += `<option value="${type}">${displayName}</option>`;
+    });
+
+    select.innerHTML = options;
+}
+
+// Show node details
+function showNodeDetails(nodeId) {
+    const node = resourceGraphData.nodes.get(nodeId);
+    if (!node) return;
+
+    const detailsDiv = document.getElementById('selected-node-details');
+    const content = document.getElementById('node-details-content');
+
+    // Get connected nodes
+    const connectedEdges = resourceGraphData.network.getConnectedEdges(nodeId);
+    const connectedNodes = resourceGraphData.network.getConnectedNodes(nodeId);
+
+    const dependencies = connectedNodes.filter(id => {
+        const edges = resourceGraphData.network.getConnectedEdges(id);
+        return edges.some(edgeId => {
+            const edge = resourceGraphData.edges.get(edgeId);
+            return edge.from === nodeId && edge.to === id;
+        });
+    });
+
+    const dependents = connectedNodes.filter(id => {
+        const edges = resourceGraphData.network.getConnectedEdges(id);
+        return edges.some(edgeId => {
+            const edge = resourceGraphData.edges.get(edgeId);
+            return edge.from === id && edge.to === nodeId;
+        });
+    });
+
+    let html = `
+        <h6>${node.data.type}</h6>
+        <p><code>${node.id}</code></p>
+
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Dependencies (${dependencies.length})</h6>
+                <ul class="list-unstyled">
+    `;
+
+    dependencies.forEach(depId => {
+        const depNode = resourceGraphData.nodes.get(depId);
+        html += `<li><code>${depNode.label}</code></li>`;
+    });
+
+    html += `
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>Dependents (${dependents.length})</h6>
+                <ul class="list-unstyled">
+    `;
+
+    dependents.forEach(depId => {
+        const depNode = resourceGraphData.nodes.get(depId);
+        html += `<li><code>${depNode.label}</code></li>`;
+    });
+
+    html += `
+                </ul>
+            </div>
+        </div>
+    `;
+
+    if (node.data.properties) {
+        html += '<h6 class="mt-3">Properties</h6>';
+        html += '<pre class="bg-light p-2">' + JSON.stringify(node.data.properties, null, 2) + '</pre>';
+    }
+
+    content.innerHTML = html;
+    detailsDiv.style.display = 'block';
+
+    // Highlight connected nodes
+    resourceGraphData.network.selectNodes([nodeId, ...connectedNodes]);
+}
+
+// Close node details
+function closeNodeDetails() {
+    document.getElementById('selected-node-details').style.display = 'none';
+    resourceGraphData.network.unselectAll();
+}
+
+// Search graph nodes
+function searchGraphNodes() {
+    const searchTerm = document.getElementById('graph-search').value.toLowerCase();
+
+    if (!searchTerm) {
+        // Reset all nodes
+        resourceGraphData.nodes.forEach(node => {
+            resourceGraphData.nodes.update({
+                id: node.id,
+                opacity: 1.0,
+                hidden: false
+            });
+        });
+        return;
+    }
+
+    // Filter nodes
+    resourceGraphData.nodes.forEach(node => {
+        const matches = node.label.toLowerCase().includes(searchTerm) ||
+                       node.id.toLowerCase().includes(searchTerm) ||
+                       node.data.type.toLowerCase().includes(searchTerm);
+
+        resourceGraphData.nodes.update({
+            id: node.id,
+            opacity: matches ? 1.0 : 0.2
+        });
+    });
+
+    // Select matching nodes
+    const matchingNodes = resourceGraphData.nodes.get({
+        filter: node => {
+            return node.label.toLowerCase().includes(searchTerm) ||
+                   node.id.toLowerCase().includes(searchTerm) ||
+                   node.data.type.toLowerCase().includes(searchTerm);
+        }
+    }).map(n => n.id);
+
+    if (matchingNodes.length > 0) {
+        resourceGraphData.network.selectNodes(matchingNodes);
+        resourceGraphData.network.focus(matchingNodes[0], {
+            scale: 1.5,
+            animation: true
+        });
+    }
+}
+
+// Filter graph by type
+function filterGraphByType() {
+    const selectedType = document.getElementById('graph-filter-type').value;
+
+    if (!selectedType) {
+        // Show all nodes
+        resourceGraphData.nodes.forEach(node => {
+            resourceGraphData.nodes.update({
+                id: node.id,
+                hidden: false
+            });
+        });
+        return;
+    }
+
+    // Filter by type
+    resourceGraphData.nodes.forEach(node => {
+        const category = categorizeResource(node.data.type);
+        resourceGraphData.nodes.update({
+            id: node.id,
+            hidden: category !== selectedType
+        });
+    });
+}
+
+// Fit graph to view
+function fitGraphToView() {
+    if (resourceGraphData.network) {
+        resourceGraphData.network.fit({
+            animation: {
+                duration: 1000,
+                easingFunction: 'easeInOutQuad'
+            }
+        });
+    }
+}
+
+// Reset graph zoom
+function resetGraphZoom() {
+    if (resourceGraphData.network) {
+        resourceGraphData.network.moveTo({
+            scale: 1.0,
+            animation: {
+                duration: 500,
+                easingFunction: 'easeInOutQuad'
+            }
+        });
+    }
+}
+
+// Toggle graph physics
+function toggleGraphPhysics() {
+    if (resourceGraphData.network) {
+        resourceGraphData.physicsEnabled = !resourceGraphData.physicsEnabled;
+        resourceGraphData.network.setOptions({
+            physics: {
+                enabled: resourceGraphData.physicsEnabled
+            }
+        });
+
+        Toast.info(`Physics ${resourceGraphData.physicsEnabled ? 'enabled' : 'disabled'}`);
+    }
+}
+
+// Export graph as Mermaid
+async function exportGraphAsMermaid() {
+    try {
+        if (!resourceGraphData.rawData) {
+            throw new Error('No graph data available. Generate a graph first.');
+        }
+
+        Toast.info('Generating Mermaid diagram...');
+
+        const response = await fetch(`${API_BASE}/graph/mermaid`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(resourceGraphData.rawData)
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to generate Mermaid diagram');
+        }
+
+        const result = await response.json();
+
+        // Display Mermaid code
+        const container = document.getElementById('mermaid-diagram-container');
+        const codeEl = document.getElementById('mermaid-code');
+
+        codeEl.textContent = result.diagram;
+        container.style.display = 'block';
+
+        container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        Toast.success('Mermaid diagram generated!');
+
+    } catch (error) {
+        Toast.error(`Mermaid export failed: ${error.message}`);
+    }
+}
+
+// Export graph as DOT
+async function exportGraphAsDOT() {
+    try {
+        if (!resourceGraphData.rawData) {
+            throw new Error('No graph data available. Generate a graph first.');
+        }
+
+        Toast.info('Generating DOT file...');
+
+        const response = await fetch(`${API_BASE}/graph/dot`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(resourceGraphData.rawData)
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to generate DOT file');
+        }
+
+        const result = await response.json();
+
+        // Download DOT file
+        const blob = new Blob([result.dot], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'resource-graph.dot';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        Toast.success('DOT file downloaded!');
+
+    } catch (error) {
+        Toast.error(`DOT export failed: ${error.message}`);
+    }
+}
+
+// Copy Mermaid code to clipboard
+function copyMermaidCode() {
+    const codeEl = document.getElementById('mermaid-code');
+    const text = codeEl.textContent;
+
+    navigator.clipboard.writeText(text).then(() => {
+        Toast.success('Mermaid code copied to clipboard!');
+    }).catch(() => {
+        Toast.error('Failed to copy to clipboard');
+    });
 }
 
 // Initialize on page load
