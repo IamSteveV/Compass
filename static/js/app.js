@@ -89,9 +89,10 @@ function showSection(section) {
     const patternsSection = document.getElementById('patterns-section');
     const notificationsSection = document.getElementById('notifications-section');
     const terraformCloudSection = document.getElementById('terraform-cloud-section');
+    const analyticsSection = document.getElementById('analytics-section');
 
     // Fade out current section
-    [validateSection, patternsSection, notificationsSection, terraformCloudSection].forEach(s => {
+    [validateSection, patternsSection, notificationsSection, terraformCloudSection, analyticsSection].forEach(s => {
         if (s && s.style.display !== 'none') {
             s.style.opacity = '0';
             setTimeout(() => {
@@ -116,6 +117,9 @@ function showSection(section) {
         } else if (section === 'terraform-cloud') {
             terraformCloudSection.style.display = 'block';
             setTimeout(() => { terraformCloudSection.style.opacity = '1'; }, 10);
+        } else if (section === 'analytics') {
+            analyticsSection.style.display = 'block';
+            setTimeout(() => { analyticsSection.style.opacity = '1'; }, 10);
         }
     }, 300);
 }
@@ -1503,6 +1507,628 @@ async function validateWorkspace(workspaceName) {
     } finally{
         hideLoading();
     }
+}
+
+// ==========================================
+// Analytics Dashboard Functions
+// ==========================================
+
+// Global state for analytics
+let analyticsData = {
+    summary: null,
+    trends: null,
+    patterns: null,
+    rules: null,
+    history: [],
+    charts: {}
+};
+
+// Load system-wide analytics summary
+async function loadSystemAnalytics() {
+    try {
+        Toast.info('Loading system analytics...');
+        showLoading('Fetching analytics data...');
+
+        const response = await fetch(`${API_BASE}/analytics/summary`);
+        if (!response.ok) {
+            throw new Error('Failed to load analytics');
+        }
+
+        const data = await response.json();
+        analyticsData.summary = data;
+
+        // Display overview cards
+        displayAnalyticsOverview(data);
+
+        // Load related data
+        await Promise.all([
+            loadPatternStatistics(),
+            loadRulePerformance(),
+            loadTopViolations(),
+            loadValidationHistory()
+        ]);
+
+        Toast.success('Analytics loaded successfully!');
+
+    } catch (error) {
+        Toast.error(`Failed to load analytics: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Display analytics overview cards
+function displayAnalyticsOverview(data) {
+    const container = document.getElementById('analytics-stats-cards');
+    const overviewDiv = document.getElementById('analytics-overview');
+
+    overviewDiv.style.display = 'block';
+
+    const cards = [
+        {
+            title: 'Total Validations',
+            value: data.total_validations || 0,
+            icon: 'clipboard-check',
+            color: 'primary'
+        },
+        {
+            title: 'Avg. Compliance',
+            value: `${((data.average_compliance || 0) * 100).toFixed(1)}%`,
+            icon: 'graph-up',
+            color: 'success'
+        },
+        {
+            title: 'Active Patterns',
+            value: data.unique_patterns || 0,
+            icon: 'diagram-3',
+            color: 'info'
+        },
+        {
+            title: 'Total Rules',
+            value: data.total_rules || 0,
+            icon: 'shield-check',
+            color: 'warning'
+        }
+    ];
+
+    let html = '';
+    cards.forEach(card => {
+        html += `
+            <div class="col-md-3 mb-3">
+                <div class="card text-center bg-${card.color} text-white">
+                    <div class="card-body">
+                        <i class="bi bi-${card.icon} fs-1"></i>
+                        <h3 class="mt-2 mb-0">${card.value}</h3>
+                        <p class="mb-0">${card.title}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+// Load compliance trends
+async function loadComplianceTrends() {
+    try {
+        Toast.info('Loading compliance trends...');
+        showLoading('Fetching trend data...');
+
+        const response = await fetch(`${API_BASE}/analytics/trends?days=30`);
+        if (!response.ok) {
+            throw new Error('Failed to load trends');
+        }
+
+        const data = await response.json();
+        analyticsData.trends = data;
+
+        displayComplianceTrends(data);
+        Toast.success('Trends loaded successfully!');
+
+    } catch (error) {
+        Toast.error(`Failed to load trends: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Display compliance trends chart
+function displayComplianceTrends(data) {
+    const section = document.getElementById('compliance-trends-section');
+    section.style.display = 'block';
+
+    const ctx = document.getElementById('complianceTrendsChart');
+
+    // Destroy existing chart if it exists
+    if (analyticsData.charts.compliance) {
+        analyticsData.charts.compliance.destroy();
+    }
+
+    analyticsData.charts.compliance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.dates || [],
+            datasets: [{
+                label: 'Compliance Score',
+                data: data.scores || [],
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Compliance: ${(context.parsed.y * 100).toFixed(1)}%`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 1,
+                    ticks: {
+                        callback: function(value) {
+                            return (value * 100).toFixed(0) + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Load pattern usage statistics
+async function loadPatternStatistics() {
+    try {
+        const response = await fetch(`${API_BASE}/analytics/patterns`);
+        if (!response.ok) {
+            throw new Error('Failed to load pattern statistics');
+        }
+
+        const data = await response.json();
+        analyticsData.patterns = data;
+
+        displayPatternStatistics(data);
+
+    } catch (error) {
+        console.error('Failed to load pattern statistics:', error);
+    }
+}
+
+// Display pattern statistics
+function displayPatternStatistics(data) {
+    const section = document.getElementById('pattern-stats-section');
+    section.style.display = 'block';
+
+    const ctx = document.getElementById('patternUsageChart');
+
+    // Destroy existing chart if it exists
+    if (analyticsData.charts.patterns) {
+        analyticsData.charts.patterns.destroy();
+    }
+
+    const patterns = data.patterns || [];
+    const labels = patterns.map(p => p.pattern_name);
+    const counts = patterns.map(p => p.usage_count);
+    const colors = [
+        'rgba(255, 99, 132, 0.8)',
+        'rgba(54, 162, 235, 0.8)',
+        'rgba(255, 206, 86, 0.8)',
+        'rgba(75, 192, 192, 0.8)',
+        'rgba(153, 102, 255, 0.8)',
+        'rgba(255, 159, 64, 0.8)'
+    ];
+
+    analyticsData.charts.patterns = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: counts,
+                backgroundColor: colors.slice(0, labels.length),
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'right'
+                }
+            }
+        }
+    });
+
+    // Display pattern table
+    const tableDiv = document.getElementById('pattern-usage-table');
+    let tableHtml = '<table class="table table-sm"><thead><tr><th>Pattern</th><th>Count</th><th>%</th></tr></thead><tbody>';
+
+    const total = counts.reduce((a, b) => a + b, 0);
+    patterns.forEach(p => {
+        const percentage = total > 0 ? ((p.usage_count / total) * 100).toFixed(1) : 0;
+        tableHtml += `
+            <tr>
+                <td>${p.pattern_name}</td>
+                <td>${p.usage_count}</td>
+                <td>${percentage}%</td>
+            </tr>
+        `;
+    });
+
+    tableHtml += '</tbody></table>';
+    tableDiv.innerHTML = tableHtml;
+}
+
+// Load rule performance metrics
+async function loadRulePerformance() {
+    try {
+        const response = await fetch(`${API_BASE}/analytics/rules`);
+        if (!response.ok) {
+            throw new Error('Failed to load rule performance');
+        }
+
+        const data = await response.json();
+        analyticsData.rules = data;
+
+        displayRulePerformance(data);
+
+    } catch (error) {
+        console.error('Failed to load rule performance:', error);
+    }
+}
+
+// Display rule performance metrics
+function displayRulePerformance(data) {
+    const section = document.getElementById('rule-performance-section');
+    section.style.display = 'block';
+
+    const tbody = document.querySelector('#rule-performance-table tbody');
+    const rules = data.rules || [];
+
+    let html = '';
+    rules.forEach(rule => {
+        const passRate = rule.total_executions > 0
+            ? ((rule.pass_count / rule.total_executions) * 100).toFixed(1)
+            : 0;
+
+        const passRateClass = passRate >= 80 ? 'success' : passRate >= 50 ? 'warning' : 'danger';
+
+        html += `
+            <tr>
+                <td><code>${rule.rule_id}</code></td>
+                <td><span class="badge bg-secondary">${rule.category}</span></td>
+                <td>${rule.total_executions}</td>
+                <td>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar bg-${passRateClass}" role="progressbar"
+                             style="width: ${passRate}%" aria-valuenow="${passRate}"
+                             aria-valuemin="0" aria-valuemax="100">
+                            ${passRate}%
+                        </div>
+                    </div>
+                </td>
+                <td>${rule.avg_execution_time_ms ? rule.avg_execution_time_ms.toFixed(2) : 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+// Load top violations
+async function loadTopViolations() {
+    try {
+        const response = await fetch(`${API_BASE}/analytics/summary`);
+        if (!response.ok) {
+            return;
+        }
+
+        const data = await response.json();
+
+        if (data.top_violations && data.top_violations.length > 0) {
+            displayTopViolations(data.top_violations);
+        }
+
+    } catch (error) {
+        console.error('Failed to load top violations:', error);
+    }
+}
+
+// Display top violations chart
+function displayTopViolations(violations) {
+    const section = document.getElementById('top-violations-section');
+    section.style.display = 'block';
+
+    const ctx = document.getElementById('topViolationsChart');
+
+    // Destroy existing chart if it exists
+    if (analyticsData.charts.violations) {
+        analyticsData.charts.violations.destroy();
+    }
+
+    const labels = violations.map(v => v.rule_id);
+    const counts = violations.map(v => v.count);
+
+    analyticsData.charts.violations = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Violation Count',
+                data: counts,
+                backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            indexAxis: 'y',
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// Load validation history
+async function loadValidationHistory() {
+    try {
+        const response = await fetch(`${API_BASE}/history?limit=50`);
+        if (!response.ok) {
+            throw new Error('Failed to load validation history');
+        }
+
+        const data = await response.json();
+        analyticsData.history = data.validations || [];
+
+        displayValidationHistory(analyticsData.history);
+        populateComparisonDropdowns(analyticsData.history);
+
+    } catch (error) {
+        console.error('Failed to load validation history:', error);
+    }
+}
+
+// Display validation history table
+function displayValidationHistory(validations) {
+    const section = document.getElementById('validation-history-section');
+    section.style.display = 'block';
+
+    const tbody = document.querySelector('#validation-history-table tbody');
+
+    let html = '';
+    validations.forEach(val => {
+        const statusClass = val.status === 'passed' ? 'success' :
+                           val.status === 'failed' ? 'danger' : 'warning';
+
+        const compliance = val.compliance_score
+            ? `${(val.compliance_score * 100).toFixed(1)}%`
+            : 'N/A';
+
+        const timestamp = new Date(val.timestamp).toLocaleString();
+
+        html += `
+            <tr>
+                <td>${timestamp}</td>
+                <td><code>${val.source_identifier || val.source_type}</code></td>
+                <td>${val.pattern_name || 'Unknown'}</td>
+                <td><span class="badge bg-${statusClass}">${val.status}</span></td>
+                <td>${compliance}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="viewValidationDetails('${val.validation_id}')">
+                        <i class="bi bi-eye"></i> View
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="downloadValidationReport('${val.validation_id}')">
+                        <i class="bi bi-download"></i> PDF
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+// Filter validation history
+function filterValidationHistory() {
+    const searchTerm = document.getElementById('history-search').value.toLowerCase();
+    const rows = document.querySelectorAll('#validation-history-table tbody tr');
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(searchTerm) ? '' : 'none';
+    });
+}
+
+// View validation details
+async function viewValidationDetails(validationId) {
+    try {
+        Toast.info('Loading validation details...');
+        showLoading('Fetching validation report...');
+
+        const response = await fetch(`${API_BASE}/history/${validationId}`);
+        if (!response.ok) {
+            throw new Error('Failed to load validation details');
+        }
+
+        const report = await response.json();
+        displayValidationReport(report);
+
+        // Scroll to results
+        document.getElementById('validation-results').scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        });
+
+        Toast.success('Validation details loaded!');
+
+    } catch (error) {
+        Toast.error(`Failed to load details: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Download validation report as PDF
+async function downloadValidationReport(validationId) {
+    try {
+        Toast.info('Generating PDF report...');
+
+        const response = await fetch(`${API_BASE}/reports/${validationId}/pdf`);
+        if (!response.ok) {
+            throw new Error('Failed to generate PDF');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `validation-report-${validationId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        Toast.success('PDF downloaded successfully!');
+
+    } catch (error) {
+        Toast.error(`Failed to download PDF: ${error.message}`);
+    }
+}
+
+// Populate comparison dropdowns
+function populateComparisonDropdowns(validations) {
+    const select1 = document.getElementById('compare-validation-1');
+    const select2 = document.getElementById('compare-validation-2');
+
+    let options = '<option value="">Select a validation...</option>';
+    validations.forEach(val => {
+        const timestamp = new Date(val.timestamp).toLocaleString();
+        options += `<option value="${val.validation_id}">${timestamp} - ${val.source_identifier || val.source_type}</option>`;
+    });
+
+    select1.innerHTML = options;
+    select2.innerHTML = options;
+}
+
+// Compare validations
+async function compareValidations() {
+    try {
+        const val1 = document.getElementById('compare-validation-1').value;
+        const val2 = document.getElementById('compare-validation-2').value;
+
+        if (!val1 || !val2) {
+            Toast.warning('Please select two validations to compare');
+            return;
+        }
+
+        if (val1 === val2) {
+            Toast.warning('Please select different validations');
+            return;
+        }
+
+        Toast.info('Comparing validations...');
+        showLoading('Generating comparison...');
+
+        const response = await fetch(`${API_BASE}/analytics/compare?validation_ids=${val1},${val2}`);
+        if (!response.ok) {
+            throw new Error('Failed to compare validations');
+        }
+
+        const data = await response.json();
+        displayComparisonResults(data);
+
+        Toast.success('Comparison complete!');
+
+    } catch (error) {
+        Toast.error(`Comparison failed: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Display comparison results
+function displayComparisonResults(data) {
+    const container = document.getElementById('comparison-results');
+    container.style.display = 'block';
+
+    const val1 = data.validation_1;
+    const val2 = data.validation_2;
+    const diff = data.differences;
+
+    let html = `
+        <h5>Comparison Results</h5>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        Validation 1
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Status:</strong> <span class="badge bg-${val1.status === 'passed' ? 'success' : 'danger'}">${val1.status}</span></p>
+                        <p><strong>Compliance:</strong> ${(val1.compliance_score * 100).toFixed(1)}%</p>
+                        <p><strong>Total Rules:</strong> ${val1.total_rules}</p>
+                        <p><strong>Passed:</strong> ${val1.passed_rules}</p>
+                        <p><strong>Failed:</strong> ${val1.failed_rules}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        Validation 2
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Status:</strong> <span class="badge bg-${val2.status === 'passed' ? 'success' : 'danger'}">${val2.status}</span></p>
+                        <p><strong>Compliance:</strong> ${(val2.compliance_score * 100).toFixed(1)}%</p>
+                        <p><strong>Total Rules:</strong> ${val2.total_rules}</p>
+                        <p><strong>Passed:</strong> ${val2.passed_rules}</p>
+                        <p><strong>Failed:</strong> ${val2.failed_rules}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header bg-secondary text-white">
+                Key Differences
+            </div>
+            <div class="card-body">
+                <p><strong>Compliance Change:</strong>
+                    <span class="badge bg-${diff.compliance_change > 0 ? 'success' : 'danger'}">
+                        ${diff.compliance_change > 0 ? '+' : ''}${(diff.compliance_change * 100).toFixed(1)}%
+                    </span>
+                </p>
+                <p><strong>New Failures:</strong> ${diff.new_failures || 0}</p>
+                <p><strong>New Passes:</strong> ${diff.new_passes || 0}</p>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+    container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // Initialize on page load

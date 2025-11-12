@@ -26,6 +26,9 @@
                         <a class="nav-link" href="/static/dashboard.html">Dashboard</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSection('analytics')">Analytics</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="#" onclick="showSection('terraform-cloud')">Terraform Cloud</a>
                     </li>
                     <li class="nav-item">
@@ -407,9 +410,202 @@
                 </div>
             </div>
         </div>
+
+        <!-- Analytics Section -->
+        <div id="analytics-section" style="display: none;">
+            <h2>Analytics Dashboard</h2>
+            <p class="text-muted">Comprehensive analytics and insights for validation history, compliance trends, and pattern usage</p>
+
+            <!-- Quick Actions -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <button class="btn btn-primary w-100" onclick="loadSystemAnalytics()">
+                                <i class="bi bi-graph-up"></i> Load System Analytics
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-info w-100" onclick="loadComplianceTrends()">
+                                <i class="bi bi-clock-history"></i> Load Compliance Trends
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Overview Cards -->
+            <div id="analytics-overview" style="display: none;">
+                <h3>System Overview</h3>
+                <div class="row mb-4" id="analytics-stats-cards">
+                    <!-- Stats cards will be populated here -->
+                </div>
+            </div>
+
+            <!-- Compliance Trends Chart -->
+            <div id="compliance-trends-section" style="display: none;">
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Compliance Trends</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="complianceTrendsChart" height="80"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pattern Usage Statistics -->
+            <div id="pattern-stats-section" style="display: none;">
+                <div class="card mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">Pattern Usage Statistics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <canvas id="patternUsageChart" height="200"></canvas>
+                            </div>
+                            <div class="col-md-6">
+                                <div id="pattern-usage-table">
+                                    <!-- Pattern usage table -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rule Performance -->
+            <div id="rule-performance-section" style="display: none;">
+                <div class="card mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">Rule Performance Metrics</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-striped" id="rule-performance-table">
+                            <thead>
+                                <tr>
+                                    <th>Rule</th>
+                                    <th>Category</th>
+                                    <th>Executions</th>
+                                    <th>Pass Rate</th>
+                                    <th>Avg. Time (ms)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Rule performance data -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Violations -->
+            <div id="top-violations-section" style="display: none;">
+                <div class="card mb-4">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">Most Common Violations</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="topViolationsChart" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Validation History -->
+            <div id="validation-history-section" style="display: none;">
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Recent Validation History</h5>
+                        <button class="btn btn-sm btn-light" onclick="loadValidationHistory()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <input type="text" class="form-control" id="history-search"
+                                   placeholder="Search by source, pattern, or status..."
+                                   onkeyup="filterValidationHistory()">
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="validation-history-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Source</th>
+                                        <th>Pattern</th>
+                                        <th>Status</th>
+                                        <th>Compliance</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- History rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <nav>
+                            <ul class="pagination" id="history-pagination">
+                                <!-- Pagination controls -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparison Tool -->
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">Compare Validations</h5>
+                </div>
+                <div class="card-body">
+                    <p>Select two or more validations to compare their results</p>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="compare-validation-1" class="form-label">Validation 1</label>
+                            <select class="form-select" id="compare-validation-1">
+                                <option value="">Select a validation...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="compare-validation-2" class="form-label">Validation 2</label>
+                            <select class="form-select" id="compare-validation-2">
+                                <option value="">Select a validation...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="compareValidations()">
+                        <i class="bi bi-arrow-left-right"></i> Compare
+                    </button>
+                    <div id="comparison-results" class="mt-4" style="display: none;">
+                        <!-- Comparison results -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Help Section -->
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Analytics Guide</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Available Analytics:</h6>
+                    <ul>
+                        <li><strong>System Analytics</strong> - Overall statistics including total validations, compliance rates, and pattern usage</li>
+                        <li><strong>Compliance Trends</strong> - Historical compliance scores over time to track improvements</li>
+                        <li><strong>Pattern Usage</strong> - Distribution of architectural patterns across your infrastructure</li>
+                        <li><strong>Rule Performance</strong> - Execution statistics and pass rates for validation rules</li>
+                        <li><strong>Top Violations</strong> - Most frequently violated rules to prioritize remediation</li>
+                        <li><strong>Validation History</strong> - Complete audit trail of all validations with search and filtering</li>
+                        <li><strong>Comparison Tool</strong> - Side-by-side comparison of validation results to track changes</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>
